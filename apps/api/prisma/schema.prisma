@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum ScoringType {
+  FULL_PPR
+  HALF_PPR
+}
+
+enum DraftType {
+  SNAKE
+  AUCTION
+}
+
+enum LeagueStatus {
+  SETUP
+  DRAFTING
+  ACTIVE
+  PLAYOFFS
+  COMPLETE
+}
+
+enum LeagueVisibility {
+  PRIVATE
+  PUBLIC
+}
+
+enum PayoutPreset {
+  WINNER_TAKES_ALL
+  TOP_TWO
+  TOP_THREE
+}
+
+enum PaymentType {
+  BUY_IN
+  PAYOUT
+  REFUND
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  username         String   @unique
+  passwordHash     String
+  stripeCustomerId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+  teams         Team[]
+  commissioning League[]       @relation("Commissioner")
+  payments      Payment[]
+  notifications Notification[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── League ───────────────────────────────────────────────────────────────────
+
+model League {
+  id              String           @id @default(cuid())
+  name            String
+  commissionerId  String
+  maxTeams        Int              @default(12)
+  buyIn           Int              // in cents (e.g. 5000 = $50)
+  payoutPreset    PayoutPreset     @default(WINNER_TAKES_ALL)
+  scoringType     ScoringType      @default(HALF_PPR)
+  draftType       DraftType        @default(SNAKE)
+  visibility      LeagueVisibility @default(PRIVATE)
+  inviteCode      String           @unique @default(cuid())
+  status          LeagueStatus     @default(SETUP)
+  draftStartsAt   DateTime?
+  draftAuctionBudget Int           @default(200) // $200 fixed for auction
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  commissioner User @relation("Commissioner", fields: [commissionerId], references: [id])
+  teams        Team[]
+  matchups     Matchup[]
+  draftPicks   DraftPick[]
+  payments     Payment[]
+
+  @@index([visibility, status])
+  @@index([inviteCode])
+}
+
+// ─── Team ─────────────────────────────────────────────────────────────────────
+
+model Team {
+  id        String   @id @default(cuid())
+  leagueId  String
+  userId    String
+  name      String
+  paid      Boolean  @default(false)
+  draftOrder Int?
+  createdAt DateTime @default(now())
+
+  league         League          @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id])
+  rosterSlots    RosterSlot[]
+  homeMatchups   Matchup[]       @relation("HomeTeam")
+  awayMatchups   Matchup[]       @relation("AwayTeam")
+  draftPicks     DraftPick[]
+
+  @@unique([leagueId, userId])
+  @@index([leagueId])
+  @@index([userId])
+}
+
+// ─── Roster ───────────────────────────────────────────────────────────────────
+
+model RosterSlot {
+  id        String   @id @default(cuid())
+  teamId    String
+  playerId  String   // Sleeper player ID
+  slot      String   // QB, RB, WR, TE, FLEX, K, DEF, BENCH
+  week      Int?     // null = season-long, set for weekly lineup lock
+  updatedAt DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, playerId])
+  @@index([teamId])
+}
+
+// ─── Matchup ──────────────────────────────────────────────────────────────────
+
+model Matchup {
+  id          String   @id @default(cuid())
+  leagueId    String
+  week        Int
+  homeTeamId  String
+  awayTeamId  String
+  homeScore   Float    @default(0)
+  awayScore   Float    @default(0)
+  isPlayoff   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  homeTeam Team   @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam Team   @relation("AwayTeam", fields: [awayTeamId], references: [id])
+
+  @@unique([leagueId, week, homeTeamId])
+  @@index([leagueId, week])
+}
+
+// ─── Draft ────────────────────────────────────────────────────────────────────
+
+model DraftPick {
+  id        String   @id @default(cuid())
+  leagueId  String
+  teamId    String
+  playerId  String
+  round     Int?     // snake draft
+  pickNumber Int?    // snake draft
+  amount    Int?     // auction draft: winning bid in dollars
+  pickedAt  DateTime @default(now())
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  @@unique([leagueId, playerId])
+  @@index([leagueId])
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+enum NotificationType {
+  DRAFT_PICK
+  DRAFT_START
+  LINEUP_LOCK
+  SCORE_UPDATED
+  PLAYOFF_QUALIFIED
+  PAYOUT_ISSUED
+  LEAGUE_INVITE
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  leagueId  String?
+  type      NotificationType
+  title     String
+  body      String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+
+model Payment {
+  id                    String        @id @default(cuid())
+  leagueId              String
+  userId                String
+  amountCents           Int
+  type                  PaymentType
+  status                PaymentStatus @default(PENDING)
+  stripePaymentIntentId String?       @unique
+  stripeTransferId      String?       @unique
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  league League @relation(fields: [leagueId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([leagueId])
+  @@index([userId])
+}
