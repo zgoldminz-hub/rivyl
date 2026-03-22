@@ -12,6 +12,8 @@ import MyTeam from "./pages/MyTeam";
 import MatchupDetail from "./pages/MatchupDetail";
 import PlayoffBracket from "./pages/PlayoffBracket";
 import CommissionerPanel from "./pages/CommissionerPanel";
+import WaiverWire from "./pages/WaiverWire";
+import Trades from "./pages/Trades";
 import Toast from "./components/Toast";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -51,6 +53,8 @@ export default function App() {
         <Route path="/leagues/:id/matchup/:matchupId" element={<PrivateRoute><MatchupDetail /></PrivateRoute>} />
         <Route path="/leagues/:id/bracket" element={<PrivateRoute><PlayoffBracket /></PrivateRoute>} />
         <Route path="/leagues/:id/commissioner" element={<PrivateRoute><CommissionerPanel /></PrivateRoute>} />
+        <Route path="/leagues/:id/waivers" element={<PrivateRoute><WaiverWire /></PrivateRoute>} />
+        <Route path="/leagues/:id/trades" element={<PrivateRoute><Trades /></PrivateRoute>} />
       </Routes>
     </BrowserRouter>
     </ErrorBoundary>

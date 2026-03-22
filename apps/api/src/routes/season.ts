@@ -73,13 +73,29 @@ router.get("/:leagueId/matchup/:matchupId", async (req: AuthRequest, res: Respon
     // Stats not available yet
   }
 
+  function buildStatLine(s: any) {
+    const lines: string[] = [];
+    if (s.pass_yd) lines.push(`${s.pass_yd} pass yds`);
+    if (s.pass_td) lines.push(`${s.pass_td} pass TD`);
+    if (s.pass_int) lines.push(`${s.pass_int} INT`);
+    if (s.rush_yd) lines.push(`${s.rush_yd} rush yds`);
+    if (s.rush_td) lines.push(`${s.rush_td} rush TD`);
+    if (s.rec) lines.push(`${s.rec} rec`);
+    if (s.rec_yd) lines.push(`${s.rec_yd} rec yds`);
+    if (s.rec_td) lines.push(`${s.rec_td} rec TD`);
+    if (s.fum_lost) lines.push(`${s.fum_lost} fum lost`);
+    return lines.join(" · ");
+  }
+
   function enrichRoster(slots: any[]) {
-    return slots.map((s) => ({
-      ...s,
-      points: stats[s.playerId]
-        ? getPlayerPoints(stats[s.playerId], matchup!.league.scoringType)
-        : 0,
-    }));
+    return slots.map((s) => {
+      const raw = stats[s.playerId];
+      return {
+        ...s,
+        points: raw ? getPlayerPoints(raw, matchup!.league.scoringType) : 0,
+        statLine: raw ? buildStatLine(raw) : "",
+      };
+    });
   }
 
   res.json({

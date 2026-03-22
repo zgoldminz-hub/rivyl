@@ -147,6 +147,12 @@ export default function LeaguePage() {
                 <Button onClick={() => navigate(`/leagues/${league.id}/my-team`)} style={{ fontSize: "13px" }}>
                   My Team
                 </Button>
+                <Button variant="ghost" onClick={() => navigate(`/leagues/${league.id}/waivers`)} style={{ fontSize: "13px" }}>
+                  Waivers
+                </Button>
+                <Button variant="ghost" onClick={() => navigate(`/leagues/${league.id}/trades`)} style={{ fontSize: "13px" }}>
+                  Trades
+                </Button>
                 {league.status === "PLAYOFFS" && (
                   <Button variant="ghost" onClick={() => navigate(`/leagues/${league.id}/bracket`)} style={{ fontSize: "13px" }}>
                     🏆 Bracket

@@ -104,6 +104,9 @@ model League {
   matchups     Matchup[]
   draftPicks   DraftPick[]
   payments     Payment[]
+  waiverClaims WaiverClaim[]
+  trades       Trade[]
+  draftState   DraftState?
 
   @@index([visibility, status])
   @@index([inviteCode])
@@ -126,6 +129,9 @@ model Team {
   homeMatchups   Matchup[]       @relation("HomeTeam")
   awayMatchups   Matchup[]       @relation("AwayTeam")
   draftPicks     DraftPick[]
+  waiverClaims   WaiverClaim[]
+  proposedTrades Trade[]       @relation("ProposingTeam")
+  receivedTrades Trade[]       @relation("ReceivingTeam")
 
   @@unique([leagueId, userId])
   @@index([leagueId])
@@ -199,6 +205,10 @@ enum NotificationType {
   PLAYOFF_QUALIFIED
   PAYOUT_ISSUED
   LEAGUE_INVITE
+  WAIVER_CLAIMED
+  TRADE_PROPOSED
+  TRADE_ACCEPTED
+  TRADE_REJECTED
 }
 
 model Notification {
@@ -236,4 +246,67 @@ model Payment {
 
   @@index([leagueId])
   @@index([userId])
+}
+
+// ─── Waiver Wire ──────────────────────────────────────────────────────────────
+
+model WaiverClaim {
+  id           String   @id @default(cuid())
+  leagueId     String
+  teamId       String
+  addPlayerId  String
+  dropPlayerId String?
+  priority     Int      @default(0)
+  status       String   @default("PENDING") // PENDING, PROCESSED, FAILED, CANCELLED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([leagueId, status])
+  @@index([teamId])
+}
+
+// ─── Trades ───────────────────────────────────────────────────────────────────
+
+model Trade {
+  id              String   @id @default(cuid())
+  leagueId        String
+  proposingTeamId String
+  receivingTeamId String
+  status          String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, CANCELLED
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  league        League      @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  proposingTeam Team        @relation("ProposingTeam", fields: [proposingTeamId], references: [id])
+  receivingTeam Team        @relation("ReceivingTeam", fields: [receivingTeamId], references: [id])
+  items         TradeItem[]
+
+  @@index([leagueId])
+  @@index([proposingTeamId])
+  @@index([receivingTeamId])
+}
+
+model TradeItem {
+  id         String @id @default(cuid())
+  tradeId    String
+  fromTeamId String
+  playerId   String
+
+  trade    Trade @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  @@index([tradeId])
+}
+
+// ─── Draft State (crash recovery) ────────────────────────────────────────────
+
+model DraftState {
+  leagueId  String   @id
+  state     Json
+  updatedAt DateTime @updatedAt
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
 }

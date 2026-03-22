@@ -9,7 +9,10 @@ import draftRouter from "./routes/draft";
 import seasonRouter from "./routes/season";
 import notificationsRouter from "./routes/notifications";
 import commissionerRouter from "./routes/commissioner";
+import waiversRouter from "./routes/waivers";
+import tradesRouter from "./routes/trades";
 import { initDraftSocket } from "./ws/draftSocket";
+import { restoreActiveDrafts } from "./lib/draftEngine";
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -31,6 +34,8 @@ app.use("/draft", draftRouter);
 app.use("/season", seasonRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/commissioner", commissionerRouter);
+app.use("/waivers", waiversRouter);
+app.use("/trades", tradesRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true, data: { status: "healthy" } }));
 
@@ -40,6 +45,7 @@ initDraftSocket(httpServer, CLIENT_URL);
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
   console.log(`Rivyl API running on http://localhost:${PORT}`);
+  await restoreActiveDrafts();
 });

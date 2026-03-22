@@ -8,6 +8,7 @@ interface RosterSlotDetail {
   playerId: string;
   slot: string;
   points: number;
+  statLine?: string;
 }
 
 interface TeamDetail {
@@ -129,7 +130,10 @@ function RosterTable({ label, slots, align, muted }: {
           <span style={{ ...styles.slotBadge, background: `${POS_COLORS[s.slot] ?? "#374151"}20`, color: POS_COLORS[s.slot] ?? "#6b7280" }}>
             {s.slot}
           </span>
-          <span style={{ flex: 1, fontSize: "13px", fontWeight: 500, textAlign: align }}>{s.playerId}</span>
+          <div style={{ flex: 1, textAlign: align }}>
+            <span style={{ fontSize: "13px", fontWeight: 500, display: "block" }}>{s.playerId}</span>
+            {s.statLine && <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>{s.statLine}</span>}
+          </div>
           <span style={{ fontSize: "14px", fontWeight: 700, color: s.points > 0 ? "var(--color-text)" : "var(--color-text-muted)" }}>
             {s.points.toFixed(1)}
           </span>

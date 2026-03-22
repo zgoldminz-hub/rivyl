@@ -156,7 +156,42 @@ export async function initDraft(leagueId: string): Promise<DraftState> {
   }
 
   activeDrafts.set(leagueId, state);
+  await persistDraftState(leagueId, state);
   return state;
+}
+
+// ─── Persist / restore draft state ────────────────────────────────────────────
+
+async function persistDraftState(leagueId: string, state: DraftState): Promise<void> {
+  try {
+    await prisma.draftState.upsert({
+      where: { leagueId },
+      create: { leagueId, state: state as any },
+      update: { state: state as any },
+    });
+  } catch (err) {
+    console.error("Failed to persist draft state:", err);
+  }
+}
+
+export async function restoreActiveDrafts(): Promise<void> {
+  try {
+    const saved = await prisma.draftState.findMany({
+      where: { league: { status: "DRAFTING" } },
+    });
+    for (const row of saved) {
+      const state = row.state as unknown as DraftState;
+      // Reset timers to now + full duration so reconnected users get a fresh window
+      state.timerEndsAt = Date.now() + PICK_TIMER_SECONDS * 1000;
+      if (state.currentNomination) {
+        state.currentNomination.endsAt = Date.now() + 30 * 1000;
+      }
+      activeDrafts.set(row.leagueId, state);
+    }
+    if (saved.length > 0) console.log(`Restored ${saved.length} active draft(s) from DB`);
+  } catch (err) {
+    console.error("Failed to restore draft states:", err);
+  }
 }
 
 // ─── Get draft state ──────────────────────────────────────────────────────────
@@ -222,6 +257,7 @@ export async function makeSnakePick(
     state.timerEndsAt = Date.now() + PICK_TIMER_SECONDS * 1000;
   }
 
+  await persistDraftState(leagueId, state);
   return { state, pick: currentPick };
 }
 
@@ -335,6 +371,7 @@ export async function finalizeNomination(leagueId: string): Promise<DraftState> 
     state.timerEndsAt = Date.now() + PICK_TIMER_SECONDS * 1000;
   }
 
+  await persistDraftState(leagueId, state);
   return state;
 }
 
