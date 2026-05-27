@@ -14,9 +14,7 @@ import {
 } from "../lib/draftEngine";
 import { getPlayers, searchPlayers } from "../lib/sleeperApi";
 
-// Per-league auto-pick timers
 const pickTimers = new Map<string, NodeJS.Timeout>();
-// Per-league auction close timers
 const auctionTimers = new Map<string, NodeJS.Timeout>();
 
 export function initDraftSocket(httpServer: HttpServer, clientUrl: string) {
@@ -24,7 +22,6 @@ export function initDraftSocket(httpServer: HttpServer, clientUrl: string) {
     cors: { origin: clientUrl, credentials: true },
   });
 
-  // Auth middleware
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
@@ -40,56 +37,42 @@ export function initDraftSocket(httpServer: HttpServer, clientUrl: string) {
   io.on("connection", (socket: Socket) => {
     const userId = (socket as any).userId as string;
 
-    // ── Join draft room ──────────────────────────────────────────────────────
     socket.on("draft:join", async ({ leagueId }: { leagueId: string }) => {
-      // Verify user is a member
       const team = await prisma.team.findFirst({ where: { leagueId, userId } });
       if (!team) {
         socket.emit("draft:error", { message: "You are not in this league" });
         return;
       }
-
       socket.join(leagueId);
       (socket as any).leagueId = leagueId;
       (socket as any).teamId = team.id;
-
       const state = getDraftState(leagueId);
-      if (state) {
-        socket.emit("draft:state", sanitizeState(state));
-      }
+      if (state) socket.emit("draft:state", sanitizeState(state));
     });
 
-    // ── Search players ───────────────────────────────────────────────────────
     socket.on("draft:search", async ({ query, position }: { query: string; position?: string }) => {
       const leagueId = (socket as any).leagueId;
       const state = getDraftState(leagueId);
-
       const draftedIds = state
         ? new Set([
             ...state.picks.filter((p) => p.playerId).map((p) => p.playerId!),
             ...state.completedAuctionPicks.map((p) => p.playerId),
           ])
         : new Set<string>();
-
       const results = await searchPlayers(query, position, draftedIds);
       socket.emit("draft:searchResults", { players: results });
     });
 
-    // ── Snake: make pick ─────────────────────────────────────────────────────
     socket.on("draft:pick", async ({ playerId }: { playerId: string }) => {
       const leagueId = (socket as any).leagueId;
       const teamId = (socket as any).teamId;
-
       try {
         const players = await getPlayers();
         const player = players.get(playerId);
         if (!player) throw new Error("Player not found");
-
         const { state, pick } = await makeSnakePick(leagueId, teamId, player);
-
         clearPickTimer(leagueId);
         io.to(leagueId).emit("draft:picked", { pick, state: sanitizeState(state) });
-
         if (state.status === "COMPLETE") {
           io.to(leagueId).emit("draft:complete", { state: sanitizeState(state) });
         } else {
@@ -100,16 +83,13 @@ export function initDraftSocket(httpServer: HttpServer, clientUrl: string) {
       }
     });
 
-    // ── Auction: nominate ────────────────────────────────────────────────────
     socket.on("draft:nominate", async ({ playerId, openingBid }: { playerId: string; openingBid: number }) => {
       const leagueId = (socket as any).leagueId;
       const teamId = (socket as any).teamId;
-
       try {
         const players = await getPlayers();
         const player = players.get(playerId);
         if (!player) throw new Error("Player not found");
-
         const state = nominatePlayer(leagueId, teamId, player, openingBid);
         io.to(leagueId).emit("draft:nominated", { state: sanitizeState(state) });
         startAuctionTimer(io, leagueId);
@@ -118,43 +98,45 @@ export function initDraftSocket(httpServer: HttpServer, clientUrl: string) {
       }
     });
 
-    // ── Auction: bid ─────────────────────────────────────────────────────────
     socket.on("draft:bid", async ({ amount }: { amount: number }) => {
       const leagueId = (socket as any).leagueId;
       const teamId = (socket as any).teamId;
-
       try {
         const state = placeBid(leagueId, teamId, amount);
         io.to(leagueId).emit("draft:bidPlaced", { state: sanitizeState(state) });
-        // Reset auction close timer if bid placed
         resetAuctionTimer(io, leagueId, state.currentNomination!.endsAt);
       } catch (err: any) {
         socket.emit("draft:error", { message: err.message });
       }
     });
 
+    // ── Live scores rooms ────────────────────────────────────────────────────
+    socket.on("scores:join", async ({ leagueId }: { leagueId: string }) => {
+      const team = await prisma.team.findFirst({ where: { leagueId, userId } });
+      if (team) socket.join("scores:" + leagueId);
+    });
+
+    socket.on("scores:leave", ({ leagueId }: { leagueId: string }) => {
+      socket.leave("scores:" + leagueId);
+    });
+
     socket.on("disconnect", () => {
-      // no-op — state persists in memory
+      // state persists in memory
     });
   });
 
   return io;
 }
 
-// ─── Pick timer (snake) ───────────────────────────────────────────────────────
-
 function startPickTimer(io: SocketServer, leagueId: string) {
   clearPickTimer(leagueId);
-
   const timer = setTimeout(async () => {
     try {
       const players = await getPlayers();
       const result = await autoPickBestAvailable(leagueId, players);
       if (!result) return;
-
       const { state, pick } = result;
       io.to(leagueId).emit("draft:picked", { pick, state: sanitizeState(state) });
-
       if (state.status === "COMPLETE") {
         io.to(leagueId).emit("draft:complete", { state: sanitizeState(state) });
       } else {
@@ -164,7 +146,6 @@ function startPickTimer(io: SocketServer, leagueId: string) {
       console.error("Auto-pick error:", err);
     }
   }, PICK_TIMER_SECONDS * 1000);
-
   pickTimers.set(leagueId, timer);
 }
 
@@ -172,8 +153,6 @@ function clearPickTimer(leagueId: string) {
   const t = pickTimers.get(leagueId);
   if (t) { clearTimeout(t); pickTimers.delete(leagueId); }
 }
-
-// ─── Auction close timer ──────────────────────────────────────────────────────
 
 function startAuctionTimer(io: SocketServer, leagueId: string) {
   const state = getDraftState(leagueId);
@@ -184,14 +163,12 @@ function startAuctionTimer(io: SocketServer, leagueId: string) {
 function resetAuctionTimer(io: SocketServer, leagueId: string, endsAt: number) {
   const t = auctionTimers.get(leagueId);
   if (t) clearTimeout(t);
-
   const delay = Math.max(0, endsAt - Date.now());
   const timer = setTimeout(async () => {
     try {
       const state = await finalizeNomination(leagueId);
       const nom = state.completedAuctionPicks[state.completedAuctionPicks.length - 1];
       io.to(leagueId).emit("draft:auctionWon", { winner: nom, state: sanitizeState(state) });
-
       if (state.status === "COMPLETE") {
         io.to(leagueId).emit("draft:complete", { state: sanitizeState(state) });
       }
@@ -199,11 +176,8 @@ function resetAuctionTimer(io: SocketServer, leagueId: string, endsAt: number) {
       console.error("Auction finalize error:", err);
     }
   }, delay);
-
   auctionTimers.set(leagueId, timer);
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function sanitizeState(state: DraftState) {
   return {

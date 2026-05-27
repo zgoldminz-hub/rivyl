@@ -27,7 +27,7 @@ export default function Button({
     opacity: disabled || loading ? 0.6 : 1,
     cursor: disabled || loading ? "not-allowed" : "pointer",
     ...(variant === "primary"
-      ? { background: "var(--color-accent)", color: "#fff" }
+      ? { background: "var(--color-crimson)", color: "#fff" }
       : { background: "transparent", color: "var(--color-text-muted)", border: "1px solid var(--color-border)" }),
     ...style,
   };

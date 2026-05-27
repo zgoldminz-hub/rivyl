@@ -66,6 +66,7 @@ router.get("/:leagueId/panel", async (req: AuthRequest, res: Response): Promise<
         scoringType: league.scoringType,
         draftType: league.draftType,
         inviteCode: league.inviteCode,
+        draftStartsAt: league.draftStartsAt ?? null,
       },
       teams: league.teams,
       prizePool,
@@ -130,7 +131,8 @@ router.post(
 
 router.patch(
   "/:leagueId/settings",
-  [body("payoutPreset").optional().isIn(["WINNER_TAKES_ALL", "TOP_TWO", "TOP_THREE"])],
+  [body("draftStartsAt").optional().isISO8601(),
+    body("payoutPreset").optional().isIn(["WINNER_TAKES_ALL", "TOP_TWO", "TOP_THREE"])],
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { leagueId } = req.params;
     if (!(await requireCommissioner(req, res, leagueId))) return;
@@ -138,6 +140,7 @@ router.patch(
     const { payoutPreset } = req.body;
     const data: any = {};
     if (payoutPreset) data.payoutPreset = payoutPreset;
+    if (req.body.draftStartsAt) data.draftStartsAt = new Date(req.body.draftStartsAt);
 
     const updated = await prisma.league.update({ where: { id: leagueId }, data });
     res.json({ ok: true, data: { payoutPreset: updated.payoutPreset } });

@@ -9,11 +9,14 @@ interface AuthState {
   register: (email: string, username: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
   fetchMe: () => Promise<void>;
+  setUser: (user: UserPublic) => void;
 }
 
 export const useAuth = create<AuthState>((set) => ({
   user: null,
   loading: true,
+
+  setUser: (user) => set({ user }),
 
   login: async (email, password) => {
     const res = await api.post<{ accessToken: string; refreshToken: string; user: UserPublic }>(
@@ -50,14 +53,9 @@ export const useAuth = create<AuthState>((set) => ({
   fetchMe: async () => {
     set({ loading: true });
     const token = localStorage.getItem("accessToken");
-    if (!token) {
-      set({ loading: false });
-      return;
-    }
+    if (!token) { set({ loading: false }); return; }
     const res = await api.get<{ user: UserPublic }>("/auth/me");
-    if (res.ok) {
-      set({ user: res.data.user });
-    }
+    if (res.ok) set({ user: res.data.user });
     set({ loading: false });
   },
 }));

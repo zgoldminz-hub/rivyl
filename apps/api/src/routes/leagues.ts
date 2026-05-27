@@ -6,11 +6,9 @@ import { stripe, PAYOUT_SPLITS } from "../lib/stripe";
 
 const router = Router();
 
-// All league routes require auth
 router.use(requireAuth);
 
 // ─── POST /leagues — Create league ───────────────────────────────────────────
-
 router.post(
   "/",
   [
@@ -28,60 +26,49 @@ router.post(
       res.status(400).json({ ok: false, error: "Validation failed", details: errors.array() });
       return;
     }
-
     const { name, maxTeams, buyIn, payoutPreset, scoringType, draftType, visibility } = req.body;
-
     const league = await prisma.league.create({
-      data: {
-        name,
-        commissionerId: req.userId!,
-        maxTeams,
-        buyIn: buyIn * 100, // store in cents
-        payoutPreset,
-        scoringType,
-        draftType,
-        visibility,
-      },
+      data: { name, commissionerId: req.userId!, maxTeams, buyIn: buyIn * 100, payoutPreset, scoringType, draftType, visibility },
     });
-
-    // Commissioner auto-joins as team 1
     const team = await prisma.team.create({
-      data: {
-        leagueId: league.id,
-        userId: req.userId!,
-        name: await defaultTeamName(req.userId!),
-        paid: buyIn === 0,
-      },
+      data: { leagueId: league.id, userId: req.userId!, name: await defaultTeamName(req.userId!), paid: buyIn === 0 },
     });
-
-    res.status(201).json({
-      ok: true,
-      data: { league: formatLeague(league, 1), team },
-    });
+    res.status(201).json({ ok: true, data: { league: formatLeague(league, 1), team } });
   }
 );
 
-// ─── GET /leagues — List public leagues ──────────────────────────────────────
-
+// ─── GET /leagues — Discover: public leagues the user has NOT joined ──────────
 router.get(
   "/",
   [query("page").optional().isInt({ min: 1 })],
   async (req: AuthRequest, res: Response): Promise<void> => {
-    const page = parseInt((req.query.page as string) ?? "1");
+    const page  = parseInt((req.query.page as string) ?? "1");
     const limit = 20;
-    const skip = (page - 1) * limit;
+    const skip  = (page - 1) * limit;
+
+    // Get league IDs the current user is already in
+    const myTeams = await prisma.team.findMany({
+      where: { userId: req.userId! },
+      select: { leagueId: true },
+    });
+    const myLeagueIds = myTeams.map((t) => t.leagueId);
+
+    const where = {
+      visibility: "PUBLIC" as const,
+      status: { in: ["SETUP", "DRAFTING"] as any },
+      // Exclude leagues the user already joined
+      id: { notIn: myLeagueIds },
+    };
 
     const [leagues, total] = await Promise.all([
       prisma.league.findMany({
-        where: { visibility: "PUBLIC", status: { in: ["SETUP", "DRAFTING"] } },
+        where,
         include: { _count: { select: { teams: true } } },
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
-      prisma.league.count({
-        where: { visibility: "PUBLIC", status: { in: ["SETUP", "DRAFTING"] } },
-      }),
+      prisma.league.count({ where }),
     ]);
 
     res.json({
@@ -96,19 +83,13 @@ router.get(
   }
 );
 
-// ─── GET /leagues/mine — Current user's leagues ───────────────────────────────
-
+// ─── GET /leagues/mine ────────────────────────────────────────────────────────
 router.get("/mine", async (req: AuthRequest, res: Response): Promise<void> => {
   const teams = await prisma.team.findMany({
     where: { userId: req.userId },
-    include: {
-      league: {
-        include: { _count: { select: { teams: true } } },
-      },
-    },
+    include: { league: { include: { _count: { select: { teams: true } } } } },
     orderBy: { createdAt: "desc" },
   });
-
   res.json({
     ok: true,
     data: {
@@ -118,54 +99,33 @@ router.get("/mine", async (req: AuthRequest, res: Response): Promise<void> => {
         teamName: t.name,
         paid: t.paid,
         isCommissioner: t.league.commissionerId === req.userId,
+        draftOrder: t.draftOrder ?? null,
       })),
     },
   });
 });
 
-// ─── GET /leagues/:id — Get league by id or invite code ──────────────────────
-
+// ─── GET /leagues/:id ─────────────────────────────────────────────────────────
 router.get(
   "/:idOrCode",
   [param("idOrCode").notEmpty()],
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { idOrCode } = req.params;
-
     const league = await prisma.league.findFirst({
       where: { OR: [{ id: idOrCode }, { inviteCode: idOrCode }] },
       include: {
         _count: { select: { teams: true } },
-        teams: {
-          include: { user: { select: { id: true, username: true } } },
-          orderBy: { createdAt: "asc" },
-        },
+        teams: { include: { user: { select: { id: true, username: true } } }, orderBy: { createdAt: "asc" } },
       },
     });
-
-    if (!league) {
-      res.status(404).json({ ok: false, error: "League not found" });
-      return;
-    }
-
-    // Only members or public leagues can be viewed
+    if (!league) { res.status(404).json({ ok: false, error: "League not found" }); return; }
     const isMember = league.teams.some((t) => t.userId === req.userId);
-    if (league.visibility === "PRIVATE" && !isMember) {
-      res.status(403).json({ ok: false, error: "This league is private" });
-      return;
-    }
-
+    if (league.visibility === "PRIVATE" && !isMember) { res.status(403).json({ ok: false, error: "This league is private" }); return; }
     res.json({
       ok: true,
       data: {
         league: formatLeague(league, league._count.teams),
-        teams: league.teams.map((t) => ({
-          id: t.id,
-          name: t.name,
-          paid: t.paid,
-          userId: t.userId,
-          username: t.user.username,
-          isCommissioner: t.userId === league.commissionerId,
-        })),
+        teams: league.teams.map((t) => ({ id: t.id, name: t.name, paid: t.paid, userId: t.userId, username: t.user.username, isCommissioner: t.userId === league.commissionerId })),
         isMember,
         isCommissioner: league.commissionerId === req.userId,
         payoutSplit: PAYOUT_SPLITS[league.payoutPreset],
@@ -174,121 +134,53 @@ router.get(
   }
 );
 
-// ─── POST /leagues/:id/join — Join a league ───────────────────────────────────
-
+// ─── POST /leagues/:id/join ───────────────────────────────────────────────────
 router.post(
   "/:id/join",
-  [
-    param("id").notEmpty(),
-    body("teamName").trim().isLength({ min: 2, max: 30 }),
-  ],
+  [param("id").notEmpty(), body("teamName").trim().isLength({ min: 2, max: 30 })],
   async (req: AuthRequest, res: Response): Promise<void> => {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      res.status(400).json({ ok: false, error: "Validation failed", details: errors.array() });
-      return;
-    }
-
-    const league = await prisma.league.findUnique({
-      where: { id: req.params.id },
-      include: { _count: { select: { teams: true } } },
-    });
-
-    if (!league) {
-      res.status(404).json({ ok: false, error: "League not found" });
-      return;
-    }
-    if (league.status !== "SETUP") {
-      res.status(400).json({ ok: false, error: "League is no longer accepting members" });
-      return;
-    }
-    if (league._count.teams >= league.maxTeams) {
-      res.status(400).json({ ok: false, error: "League is full" });
-      return;
-    }
-
-    const existing = await prisma.team.findUnique({
-      where: { leagueId_userId: { leagueId: league.id, userId: req.userId! } },
-    });
-    if (existing) {
-      res.status(409).json({ ok: false, error: "You are already in this league" });
-      return;
-    }
-
-    // Create payment intent BEFORE creating the team.
-    // The team is only created by the Stripe webhook after payment succeeds.
-    // This ensures no slot is held without a completed payment.
+    if (!errors.isEmpty()) { res.status(400).json({ ok: false, error: "Validation failed", details: errors.array() }); return; }
+    const league = await prisma.league.findUnique({ where: { id: req.params.id }, include: { _count: { select: { teams: true } } } });
+    if (!league) { res.status(404).json({ ok: false, error: "League not found" }); return; }
+    if (league.status !== "SETUP") { res.status(400).json({ ok: false, error: "League is no longer accepting members" }); return; }
+    if (league._count.teams >= league.maxTeams) { res.status(400).json({ ok: false, error: "League is full" }); return; }
+    const existing = await prisma.team.findUnique({ where: { leagueId_userId: { leagueId: league.id, userId: req.userId! } } });
+    if (existing) { res.status(409).json({ ok: false, error: "You are already in this league" }); return; }
     const buyInDollars = league.buyIn / 100;
     const intent = await stripe.paymentIntents.create({
-      amount: league.buyIn, // already in cents
+      amount: league.buyIn,
       currency: "usd",
-      metadata: {
-        leagueId: league.id,
-        userId: req.userId!,
-        teamName: req.body.teamName,
-      },
+      metadata: { leagueId: league.id, userId: req.userId!, teamName: req.body.teamName },
       description: `Rivyl buy-in: ${league.name} ($${buyInDollars})`,
     });
-
-    res.status(201).json({
-      ok: true,
-      data: {
-        clientSecret: intent.client_secret,
-        amount: buyInDollars,
-      },
-    });
+    res.status(201).json({ ok: true, data: { clientSecret: intent.client_secret, amount: buyInDollars } });
   }
 );
 
-// ─── DELETE /leagues/:id/leave — Leave a league ───────────────────────────────
-
+// ─── DELETE /leagues/:id/leave ────────────────────────────────────────────────
 router.delete("/:id/leave", async (req: AuthRequest, res: Response): Promise<void> => {
   const league = await prisma.league.findUnique({ where: { id: req.params.id } });
-  if (!league) {
-    res.status(404).json({ ok: false, error: "League not found" });
-    return;
-  }
-  if (league.commissionerId === req.userId) {
-    res.status(400).json({ ok: false, error: "Commissioner cannot leave their own league" });
-    return;
-  }
-  if (league.status !== "SETUP") {
-    res.status(400).json({ ok: false, error: "Cannot leave after draft has started" });
-    return;
-  }
-
-  await prisma.team.delete({
-    where: { leagueId_userId: { leagueId: league.id, userId: req.userId! } },
-  });
-
+  if (!league) { res.status(404).json({ ok: false, error: "League not found" }); return; }
+  if (league.commissionerId === req.userId) { res.status(400).json({ ok: false, error: "Commissioner cannot leave their own league" }); return; }
+  if (league.status !== "SETUP") { res.status(400).json({ ok: false, error: "Cannot leave after draft has started" }); return; }
+  await prisma.team.delete({ where: { leagueId_userId: { leagueId: league.id, userId: req.userId! } } });
   res.json({ ok: true, data: null });
 });
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatLeague(league: any, memberCount: number) {
   return {
-    id: league.id,
-    name: league.name,
-    commissionerId: league.commissionerId,
-    maxTeams: league.maxTeams,
-    buyIn: league.buyIn / 100, // return in dollars
-    payoutPreset: league.payoutPreset,
-    scoringType: league.scoringType,
-    draftType: league.draftType,
-    visibility: league.visibility,
-    status: league.status,
-    inviteCode: league.inviteCode,
-    memberCount,
-    createdAt: league.createdAt,
+    id: league.id, name: league.name, commissionerId: league.commissionerId,
+    maxTeams: league.maxTeams, buyIn: league.buyIn / 100, payoutPreset: league.payoutPreset,
+    scoringType: league.scoringType, draftType: league.draftType, visibility: league.visibility,
+    status: league.status, inviteCode: league.inviteCode, memberCount,
+    createdAt: league.createdAt, draftStartsAt: league.draftStartsAt ?? null,
   };
 }
 
 async function defaultTeamName(userId: string): Promise<string> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { username: true },
-  });
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { username: true } });
   return `${user?.username ?? "Team"}'s Team`;
 }
 

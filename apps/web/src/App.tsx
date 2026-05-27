@@ -14,6 +14,9 @@ import PlayoffBracket from "./pages/PlayoffBracket";
 import CommissionerPanel from "./pages/CommissionerPanel";
 import WaiverWire from "./pages/WaiverWire";
 import Trades from "./pages/Trades";
+import Profile from "./pages/Profile";
+import Players from "./pages/Players";
+import MockDraft from "./pages/MockDraft";
 import Toast from "./components/Toast";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -55,6 +58,9 @@ export default function App() {
         <Route path="/leagues/:id/commissioner" element={<PrivateRoute><CommissionerPanel /></PrivateRoute>} />
         <Route path="/leagues/:id/waivers" element={<PrivateRoute><WaiverWire /></PrivateRoute>} />
         <Route path="/leagues/:id/trades" element={<PrivateRoute><Trades /></PrivateRoute>} />
+        <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+        <Route path="/players" element={<PrivateRoute><Players /></PrivateRoute>} />
+        <Route path="/mock-draft" element={<PrivateRoute><MockDraft /></PrivateRoute>} />
       </Routes>
     </BrowserRouter>
     </ErrorBoundary>

@@ -31,7 +31,7 @@ export default function Navbar() {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60_000); // poll every minute
+    const interval = setInterval(fetchNotifications, 60_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -49,7 +49,6 @@ export default function Navbar() {
     setUnreadCount(0);
   }
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
@@ -83,6 +82,7 @@ export default function Navbar() {
           <nav style={styles.nav}>
             <NavLink to="/dashboard" active={isActive("/dashboard")}>My Leagues</NavLink>
             <NavLink to="/discover" active={isActive("/discover")}>Discover</NavLink>
+            <NavLink to="/players" active={isActive("/players") || isActive("/mock-draft")}>Players</NavLink>
           </nav>
         </div>
         <div style={styles.right}>
@@ -90,7 +90,6 @@ export default function Navbar() {
             + Create League
           </Button>
 
-          {/* Notification bell */}
           <div style={styles.bellWrap} ref={bellRef}>
             <button style={styles.bellBtn} onClick={handleBellClick} aria-label="Notifications">
               <span style={styles.bellIcon}>🔔</span>
@@ -134,7 +133,7 @@ export default function Navbar() {
           </div>
 
           <div style={styles.userMenu}>
-            <span style={styles.username}>@{user?.username}</span>
+            <span style={{ ...styles.username, cursor: "pointer" }} onClick={() => navigate("/profile")}>@{user?.username}</span>
             <button style={styles.signOut} onClick={() => { logout(); navigate("/login"); }}>
               Sign out
             </button>
@@ -156,7 +155,7 @@ function NavLink({ to, active, children }: { to: string; active: boolean; childr
         color: active ? "var(--color-text)" : "var(--color-text-muted)",
         textDecoration: "none",
         padding: "4px 0",
-        borderBottom: active ? "2px solid var(--color-accent)" : "2px solid transparent",
+        borderBottom: active ? "2px solid var(--color-crimson)" : "2px solid transparent",
         transition: "color 0.15s",
       }}
     >
@@ -177,35 +176,26 @@ function timeAgo(dateStr: string): string {
 
 const styles: Record<string, React.CSSProperties> = {
   header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "0 24px",
-    height: "60px",
-    borderBottom: "1px solid var(--color-border)",
-    background: "var(--color-surface)",
-    position: "sticky",
-    top: 0,
-    zIndex: 100,
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    padding: "0 24px", height: "60px", borderBottom: "1px solid var(--color-border)",
+    background: "var(--color-surface)", position: "sticky", top: 0, zIndex: 100,
   },
   left: { display: "flex", alignItems: "center", gap: "32px" },
-  logo: { fontSize: "20px", fontWeight: 700, color: "var(--color-accent)", letterSpacing: "-0.5px", textDecoration: "none" },
+  logo: { fontSize: "20px", fontWeight: 700, background: "linear-gradient(90deg, var(--color-accent), var(--color-crimson))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "-0.5px", textDecoration: "none" },
   nav: { display: "flex", gap: "24px", alignItems: "center" },
   right: { display: "flex", alignItems: "center", gap: "16px" },
   userMenu: { display: "flex", alignItems: "center", gap: "12px" },
   username: { fontSize: "14px", color: "var(--color-text-muted)" },
   signOut: { background: "none", border: "none", color: "var(--color-text-muted)", fontSize: "13px", cursor: "pointer" },
-  // Bell
   bellWrap: { position: "relative" },
   bellBtn: { background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", position: "relative" },
   bellIcon: { fontSize: "18px", lineHeight: 1 },
   badge: {
     position: "absolute", top: "0", right: "0",
-    background: "#ef4444", color: "#fff", fontSize: "10px", fontWeight: 700,
+    background: "var(--color-crimson)", color: "#fff", fontSize: "10px", fontWeight: 700,
     minWidth: "16px", height: "16px", borderRadius: "999px",
     display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px",
   },
-  // Dropdown
   dropdown: {
     position: "absolute", top: "calc(100% + 8px)", right: 0,
     width: "340px", maxHeight: "420px",
@@ -215,8 +205,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   dropdownHeader: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: "14px 16px", borderBottom: "1px solid var(--color-border)",
-    flexShrink: 0,
+    padding: "14px 16px", borderBottom: "1px solid var(--color-border)", flexShrink: 0,
   },
   dropdownTitle: { fontSize: "14px", fontWeight: 700 },
   markRead: { background: "none", border: "none", color: "var(--color-accent)", fontSize: "12px", cursor: "pointer" },
@@ -227,7 +216,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: "1px solid var(--color-border)", cursor: "pointer",
     alignItems: "flex-start", position: "relative",
   },
-  unreadItem: { background: "rgba(79,124,255,0.05)" },
+  unreadItem: { background: "rgba(30,75,216,0.07)" },
   notifIcon: { fontSize: "18px", flexShrink: 0, marginTop: "2px" },
   notifContent: { flex: 1, minWidth: 0 },
   notifTitle: { fontSize: "13px", fontWeight: 600, marginBottom: "2px" },

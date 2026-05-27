@@ -26,42 +26,29 @@ export default function LeaguePage() {
   const [league, setLeague] = useState<LeagueDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Start draft
   const [startingDraft, setStartingDraft] = useState(false);
 
   async function handleStartDraft() {
     setStartingDraft(true);
-    const res = await api.post(`/draft/${id}/start`, {});
+    const res = await api.post("/draft/" + id + "/start", {});
     setStartingDraft(false);
-    if (!res.ok) {
-      setError((res as any).error);
-      return;
-    }
-    navigate(`/leagues/${id}/draft`);
+    if (!res.ok) { setError((res as any).error); return; }
+    navigate("/leagues/" + id + "/draft");
   }
 
-  // Join modal
   const [showJoin, setShowJoin] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
-
-  // Stripe payment
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [buyInAmount, setBuyInAmount] = useState(0);
 
-  useEffect(() => {
-    if (!id) return;
-    fetchLeague();
-  }, [id]);
+  useEffect(() => { if (id) fetchLeague(); }, [id]);
 
   async function fetchLeague() {
     setLoading(true);
-    const res = await api.get<{ league: LeagueDetail; teams: LeagueDetail["teams"]; isMember: boolean; isCommissioner: boolean; payoutSplit: any }>(`/leagues/${id}`);
-    if (!res.ok) {
-      setError(res.error);
-    } else {
+    const res = await api.get<{ league: LeagueDetail; teams: LeagueDetail["teams"]; isMember: boolean; isCommissioner: boolean; payoutSplit: any }>("/leagues/" + id);
+    if (!res.ok) { setError(res.error); } else {
       setLeague({ ...res.data.league, teams: res.data.teams, isMember: res.data.isMember, payoutSplit: res.data.payoutSplit });
     }
     setLoading(false);
@@ -72,23 +59,16 @@ export default function LeaguePage() {
     if (!teamName.trim()) return;
     setJoinError(null);
     setJoining(true);
-
-    const res = await api.post<{ clientSecret: string; amount: number }>(`/leagues/${id}/join`, { teamName });
+    const res = await api.post<{ clientSecret: string; amount: number }>("/leagues/" + id + "/join", { teamName });
     setJoining(false);
-
-    if (!res.ok) {
-      setJoinError(res.error);
-      return;
-    }
-
+    if (!res.ok) { setJoinError(res.error); return; }
     setClientSecret(res.data.clientSecret);
     setBuyInAmount(res.data.amount);
     setShowJoin(false);
   }
 
   function copyInviteLink() {
-    const url = `${window.location.origin}/leagues/${league?.inviteCode}`;
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(window.location.origin + "/leagues/" + league?.inviteCode);
   }
 
   if (loading) return <div style={styles.root}><Navbar /><p style={styles.center}>Loading…</p></div>;
@@ -102,12 +82,12 @@ export default function LeaguePage() {
     <div style={styles.root}>
       <Navbar />
 
-      {/* Stripe payment overlay */}
       {clientSecret && (
         <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "night" } }}>
           <PaymentModal
             clientSecret={clientSecret}
             amount={buyInAmount}
+            maxTeams={league.maxTeams}
             leagueName={league.name}
             onSuccess={() => { setClientSecret(null); fetchLeague(); }}
             onClose={() => setClientSecret(null)}
@@ -116,7 +96,6 @@ export default function LeaguePage() {
       )}
 
       <main style={styles.main}>
-        {/* Header */}
         <div style={styles.pageHeader}>
           <div>
             <button style={styles.back} onClick={() => navigate(-1)}>← Back</button>
@@ -125,38 +104,22 @@ export default function LeaguePage() {
           </div>
           <div style={styles.headerActions}>
             {isMyLeague && league.status === "SETUP" && (
-              <Button variant="ghost" onClick={copyInviteLink} style={{ fontSize: "13px" }}>
-                Copy Invite Link
-              </Button>
+              <Button variant="ghost" onClick={copyInviteLink} style={{ fontSize: "13px" }}>Copy Invite Link</Button>
             )}
             {isMyLeague && league.status === "SETUP" && league.memberCount >= 2 && (
-              <Button onClick={handleStartDraft} loading={startingDraft}>
-                Start Draft
-              </Button>
+              <Button onClick={handleStartDraft} loading={startingDraft}>Start Draft</Button>
             )}
             {league.status === "DRAFTING" && league.isMember && (
-              <Button onClick={() => navigate(`/leagues/${league.id}/draft`)}>
-                Enter Draft Room →
-              </Button>
+              <Button onClick={() => navigate("/leagues/" + league.id + "/draft")}>Enter Draft Room →</Button>
             )}
             {(league.status === "ACTIVE" || league.status === "PLAYOFFS") && league.isMember && (
               <>
-                <Button variant="ghost" onClick={() => navigate(`/leagues/${league.id}/standings`)} style={{ fontSize: "13px" }}>
-                  Standings
-                </Button>
-                <Button onClick={() => navigate(`/leagues/${league.id}/my-team`)} style={{ fontSize: "13px" }}>
-                  My Team
-                </Button>
-                <Button variant="ghost" onClick={() => navigate(`/leagues/${league.id}/waivers`)} style={{ fontSize: "13px" }}>
-                  Waivers
-                </Button>
-                <Button variant="ghost" onClick={() => navigate(`/leagues/${league.id}/trades`)} style={{ fontSize: "13px" }}>
-                  Trades
-                </Button>
+                <Button variant="ghost" onClick={() => navigate("/leagues/" + league.id + "/standings")} style={{ fontSize: "13px" }}>Standings</Button>
+                <Button onClick={() => navigate("/leagues/" + league.id + "/my-team")} style={{ fontSize: "13px" }}>My Team</Button>
+                <Button variant="ghost" onClick={() => navigate("/leagues/" + league.id + "/waivers")} style={{ fontSize: "13px" }}>Waivers</Button>
+                <Button variant="ghost" onClick={() => navigate("/leagues/" + league.id + "/trades")} style={{ fontSize: "13px" }}>Trades</Button>
                 {league.status === "PLAYOFFS" && (
-                  <Button variant="ghost" onClick={() => navigate(`/leagues/${league.id}/bracket`)} style={{ fontSize: "13px" }}>
-                    🏆 Bracket
-                  </Button>
+                  <Button variant="ghost" onClick={() => navigate("/leagues/" + league.id + "/bracket")} style={{ fontSize: "13px" }}>🏆 Bracket</Button>
                 )}
               </>
             )}
@@ -164,28 +127,24 @@ export default function LeaguePage() {
               <Button onClick={() => setShowJoin(true)}>Join League — ${league.buyIn}</Button>
             )}
             {isMyLeague && (
-              <Button variant="ghost" onClick={() => navigate(`/leagues/${league.id}/commissioner`)} style={{ fontSize: "13px" }}>
-                ⚙ Panel
-              </Button>
+              <Button variant="ghost" onClick={() => navigate("/leagues/" + league.id + "/commissioner")} style={{ fontSize: "13px" }}>⚙ League Settings</Button>
             )}
           </div>
         </div>
 
         <div style={styles.layout}>
-          {/* Left: settings + payout */}
           <div style={styles.sidebar}>
             <Section title="Settings">
-              <InfoRow label="Buy-In" value={`$${league.buyIn}`} highlight />
-              <InfoRow label="Teams" value={`${league.memberCount} / ${league.maxTeams}`} />
+              <InfoRow label="Buy-In" value={"$" + league.buyIn} highlight />
+              <InfoRow label="Teams" value={league.memberCount + " / " + league.maxTeams} />
               <InfoRow label="Scoring" value={league.scoringType === "FULL_PPR" ? "Full PPR" : "Half PPR"} />
               <InfoRow label="Draft" value={league.draftType === "SNAKE" ? "Snake Draft" : "Auction ($200)"} />
               <InfoRow label="Visibility" value={league.visibility === "PUBLIC" ? "Public" : "Private"} />
             </Section>
 
             <Section title="Prize Pool">
-              <InfoRow label="Total Pot" value={`$${potTotal.toLocaleString()}`} />
-              <InfoRow label="Platform Fee" value="-5%" />
-              <InfoRow label="Prize Pool" value={`$${prizePool.toLocaleString()}`} highlight />
+              <InfoRow label="Total Pot" value={"$" + potTotal.toLocaleString()} />
+              <InfoRow label="Prize Pool" value={"$" + prizePool.toLocaleString()} highlight />
               <div style={{ marginTop: "12px", borderTop: "1px solid var(--color-border)", paddingTop: "12px" }}>
                 <p style={styles.sectionSubLabel}>{PAYOUT_LABEL[league.payoutPreset]}</p>
                 {league.payoutSplit?.map((s: any) => (
@@ -194,7 +153,7 @@ export default function LeaguePage() {
                       {s.place === 1 ? "🥇" : s.place === 2 ? "🥈" : "🥉"} {ordinal(s.place)} Place
                     </span>
                     <span style={styles.payoutAmount}>
-                      ${Math.floor(prizePool * s.percent / 100).toLocaleString()}
+                      {"$" + Math.floor(prizePool * s.percent / 100).toLocaleString()}
                     </span>
                   </div>
                 ))}
@@ -202,9 +161,8 @@ export default function LeaguePage() {
             </Section>
           </div>
 
-          {/* Right: roster */}
           <div style={styles.content}>
-            <Section title={`Teams (${league.memberCount}/${league.maxTeams})`}>
+            <Section title={"Teams (" + league.memberCount + "/" + league.maxTeams + ")"}>
               {league.teams.map((team) => (
                 <div key={team.id} style={styles.teamRow}>
                   <div style={styles.teamLeft}>
@@ -213,14 +171,14 @@ export default function LeaguePage() {
                   </div>
                   <div style={styles.teamRight}>
                     {team.isCommissioner && <span style={styles.commBadge}>Commissioner</span>}
-                    <span style={{ ...styles.paidBadge, background: team.paid ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.1)", color: team.paid ? "var(--color-success)" : "var(--color-danger)" }}>
+                    <span style={{ ...styles.paidBadge, background: team.paid ? "rgba(34,197,94,0.15)" : "rgba(192,57,43,0.1)", color: team.paid ? "var(--color-success)" : "var(--color-danger)" }}>
                       {team.paid ? "Paid" : "Pending"}
                     </span>
                   </div>
                 </div>
               ))}
               {Array.from({ length: league.maxTeams - league.memberCount }).map((_, i) => (
-                <div key={`empty-${i}`} style={{ ...styles.teamRow, opacity: 0.3 }}>
+                <div key={"empty-" + i} style={{ ...styles.teamRow, opacity: 0.3 }}>
                   <span style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>Open slot</span>
                 </div>
               ))}
@@ -229,12 +187,26 @@ export default function LeaguePage() {
         </div>
       </main>
 
-      {/* Join modal */}
-      <Modal open={showJoin} onClose={() => setShowJoin(false)} title={`Join ${league.name}`}>
+      <Modal open={showJoin} onClose={() => setShowJoin(false)} title={"Join " + league.name}>
         <form onSubmit={handleJoin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <p style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>
-            Buy-in: <strong style={{ color: "var(--color-text)" }}>${league.buyIn}</strong> — your card will be charged after confirming.
-          </p>
+          <div style={styles.feeBreakdown}>
+            <div style={styles.feeRow}>
+              <span style={styles.feeLabel}>Buy-In</span>
+              <span style={styles.feeValue}>{"$" + league.buyIn}</span>
+            </div>
+            <div style={styles.feeRow}>
+              <span style={styles.feeLabel}>Total Pot ({league.maxTeams} teams)</span>
+              <span style={styles.feeValue}>{"$" + potTotal.toLocaleString()}</span>
+            </div>
+            <div style={styles.feeRow}>
+              <span style={styles.feeLabel}>Platform Fee (5%)</span>
+              <span style={{ ...styles.feeValue, color: "var(--color-text-muted)" }}>{"-$" + (potTotal - prizePool).toLocaleString()}</span>
+            </div>
+            <div style={{ ...styles.feeRow, borderTop: "1px solid var(--color-border)", paddingTop: "10px", marginTop: "2px" }}>
+              <span style={{ ...styles.feeLabel, fontWeight: 600, color: "var(--color-text)" }}>Prize Pool</span>
+              <span style={{ ...styles.feeValue, color: "var(--color-success)", fontWeight: 700 }}>{"$" + prizePool.toLocaleString()}</span>
+            </div>
+          </div>
           <Input
             label="Your Team Name"
             placeholder="e.g. Blitz Kings"
@@ -253,11 +225,10 @@ export default function LeaguePage() {
   );
 }
 
-// ─── Payment Modal ─────────────────────────────────────────────────────────────
-
-function PaymentModal({ amount, leagueName, onSuccess, onClose }: {
+function PaymentModal({ amount, maxTeams, leagueName, onSuccess, onClose }: {
   clientSecret: string;
   amount: number;
+  maxTeams: number;
   leagueName: string;
   onSuccess: () => void;
   onClose: () => void;
@@ -267,48 +238,56 @@ function PaymentModal({ amount, leagueName, onSuccess, onClose }: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const totalPot = amount * maxTeams;
+  const fee = totalPot - Math.floor(totalPot * 0.95);
+  const prizePool = totalPot - fee;
+
   async function handlePay(e: React.FormEvent) {
     e.preventDefault();
     if (!stripe || !elements) return;
     setError(null);
     setLoading(true);
-
-    const { error: stripeErr } = await stripe.confirmPayment({
-      elements,
-      redirect: "if_required",
-    });
-
+    const { error: stripeErr } = await stripe.confirmPayment({ elements, redirect: "if_required" });
     setLoading(false);
-    if (stripeErr) {
-      setError(stripeErr.message ?? "Payment failed");
-    } else {
-      onSuccess();
-    }
+    if (stripeErr) { setError(stripeErr.message ?? "Payment failed"); } else { onSuccess(); }
   }
 
   return (
     <div style={payStyles.overlay}>
       <div style={payStyles.modal}>
         <div style={payStyles.header}>
-          <span style={payStyles.title}>Pay Buy-In</span>
+          <span style={payStyles.title}>Pay Buy-In — {leagueName}</span>
           <button style={payStyles.close} onClick={onClose}>✕</button>
         </div>
         <div style={payStyles.body}>
-          <p style={{ fontSize: "14px", color: "var(--color-text-muted)", marginBottom: "20px" }}>
-            <strong style={{ color: "var(--color-text)" }}>${amount}</strong> buy-in for <strong style={{ color: "var(--color-text)" }}>{leagueName}</strong>
-          </p>
+          <div style={payStyles.breakdown}>
+            <div style={payStyles.breakdownRow}>
+              <span style={payStyles.breakdownLabel}>Buy-In</span>
+              <span style={payStyles.breakdownValue}>{"$" + amount}</span>
+            </div>
+            <div style={payStyles.breakdownRow}>
+              <span style={payStyles.breakdownLabel}>{"Total Pot (" + maxTeams + " teams)"}</span>
+              <span style={payStyles.breakdownValue}>{"$" + totalPot.toLocaleString()}</span>
+            </div>
+            <div style={payStyles.breakdownRow}>
+              <span style={payStyles.breakdownLabel}>Platform Fee (5%)</span>
+              <span style={{ ...payStyles.breakdownValue, color: "var(--color-text-muted)" }}>{"-$" + fee.toLocaleString()}</span>
+            </div>
+            <div style={{ ...payStyles.breakdownRow, borderTop: "1px solid var(--color-border)", paddingTop: "10px", marginTop: "4px" }}>
+              <span style={{ ...payStyles.breakdownLabel, fontWeight: 600, color: "var(--color-text)" }}>Prize Pool</span>
+              <span style={{ ...payStyles.breakdownValue, color: "var(--color-success)", fontWeight: 700 }}>{"$" + prizePool.toLocaleString()}</span>
+            </div>
+          </div>
           <form onSubmit={handlePay} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <PaymentElement />
             {error && <p style={{ fontSize: "13px", color: "var(--color-danger)" }}>{error}</p>}
-            <Button type="submit" loading={loading}>Pay ${amount}</Button>
+            <Button type="submit" loading={loading}>{"Pay $" + amount}</Button>
           </form>
         </div>
       </div>
     </div>
   );
 }
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -334,19 +313,11 @@ function ordinal(n: number) {
   return n === 1 ? "1st" : n === 2 ? "2nd" : "3rd";
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles: Record<string, React.CSSProperties> = {
   root: { minHeight: "100vh", background: "var(--color-bg)" },
   main: { maxWidth: "1060px", margin: "0 auto", padding: "32px 24px" },
   center: { padding: "40px", textAlign: "center", color: "var(--color-text-muted)" },
-  pageHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: "32px",
-    gap: "16px",
-  },
+  pageHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "32px", gap: "16px" },
   back: { background: "none", border: "none", color: "var(--color-text-muted)", fontSize: "13px", cursor: "pointer", padding: 0, marginBottom: "8px", display: "block" },
   title: { fontSize: "26px", fontWeight: 700, marginBottom: "6px" },
   status: { fontSize: "12px", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "1px" },
@@ -354,12 +325,7 @@ const styles: Record<string, React.CSSProperties> = {
   layout: { display: "grid", gridTemplateColumns: "280px 1fr", gap: "24px" },
   sidebar: { display: "flex", flexDirection: "column", gap: "16px" },
   content: {},
-  section: {
-    background: "var(--color-surface)",
-    border: "1px solid var(--color-border)",
-    borderRadius: "var(--radius)",
-    padding: "20px",
-  },
+  section: { background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius)", padding: "20px" },
   sectionTitle: { fontSize: "14px", fontWeight: 600, marginBottom: "16px", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" },
   sectionSubLabel: { fontSize: "13px", color: "var(--color-text-muted)", marginBottom: "10px" },
   infoRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" },
@@ -368,19 +334,17 @@ const styles: Record<string, React.CSSProperties> = {
   payoutRow: { display: "flex", justifyContent: "space-between", marginBottom: "8px" },
   payoutPlace: { fontSize: "14px" },
   payoutAmount: { fontSize: "14px", fontWeight: 600, color: "var(--color-success)" },
-  teamRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "12px 0",
-    borderBottom: "1px solid var(--color-border)",
-  },
+  teamRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid var(--color-border)" },
   teamLeft: { display: "flex", flexDirection: "column", gap: "2px" },
   teamName: { fontSize: "15px", fontWeight: 500 },
   teamUser: { fontSize: "12px", color: "var(--color-text-muted)" },
   teamRight: { display: "flex", alignItems: "center", gap: "8px" },
-  commBadge: { fontSize: "11px", background: "rgba(79,124,255,0.15)", color: "var(--color-accent)", padding: "3px 8px", borderRadius: "999px" },
+  commBadge: { fontSize: "11px", background: "rgba(30,75,216,0.15)", color: "var(--color-accent)", padding: "3px 8px", borderRadius: "999px" },
   paidBadge: { fontSize: "11px", padding: "3px 8px", borderRadius: "999px" },
+  feeBreakdown: { background: "var(--color-surface-2)", borderRadius: "var(--radius)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "8px" },
+  feeRow: { display: "flex", justifyContent: "space-between", alignItems: "center" },
+  feeLabel: { fontSize: "13px", color: "var(--color-text-muted)" },
+  feeValue: { fontSize: "13px", color: "var(--color-text)", fontWeight: 500 },
 };
 
 const payStyles: Record<string, React.CSSProperties> = {
@@ -389,5 +353,9 @@ const payStyles: Record<string, React.CSSProperties> = {
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", borderBottom: "1px solid var(--color-border)" },
   title: { fontWeight: 600, fontSize: "16px" },
   close: { background: "none", border: "none", color: "var(--color-text-muted)", fontSize: "16px", cursor: "pointer" },
-  body: { padding: "24px" },
+  body: { padding: "24px", display: "flex", flexDirection: "column", gap: "20px" },
+  breakdown: { background: "var(--color-surface-2)", borderRadius: "var(--radius)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "8px" },
+  breakdownRow: { display: "flex", justifyContent: "space-between", alignItems: "center" },
+  breakdownLabel: { fontSize: "13px", color: "var(--color-text-muted)" },
+  breakdownValue: { fontSize: "13px", color: "var(--color-text)", fontWeight: 500 },
 };

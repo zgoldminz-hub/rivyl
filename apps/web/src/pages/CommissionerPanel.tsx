@@ -15,7 +15,7 @@ interface StandingsEntry {
   teamId: string; teamName: string; wins: number; losses: number; pointsFor: number;
 }
 interface PanelData {
-  league: { id: string; name: string; status: string; payoutPreset: string; buyIn: number; scoringType: string; draftType: string; inviteCode: string };
+  league: { id: string; name: string; status: string; payoutPreset: string; buyIn: number; scoringType: string; draftType: string; inviteCode: string; draftStartsAt?: string | null };
   teams: TeamMember[];
   prizePool: number;
   payoutPreview: PayoutPreviewItem[];
@@ -42,13 +42,18 @@ export default function CommissionerPanel() {
   const [sendingNotif, setSendingNotif] = useState(false);
   const [triggeringPayout, setTriggeringPayout] = useState(false);
   const [payoutPreset, setPayoutPreset] = useState("WINNER_TAKES_ALL");
+  const [draftDate, setDraftDate] = useState("");
+  const [savingDate, setSavingDate] = useState(false);
 
   useEffect(() => {
     if (!leagueId) return;
-    api.get<{ data: PanelData }>(`/commissioner/${leagueId}/panel`).then((res) => {
+    api.get<PanelData>("/commissioner/" + leagueId + "/panel").then((res) => {
       if (res.ok) {
-        setData((res as any).data.data);
-        setPayoutPreset((res as any).data.data.league.payoutPreset);
+        setData(res.data);
+        setPayoutPreset(res.data.league.payoutPreset);
+        if (res.data.league.draftStartsAt) {
+          setDraftDate(new Date(res.data.league.draftStartsAt).toISOString().slice(0, 16));
+        }
       } else {
         navigate(-1);
       }
@@ -58,34 +63,41 @@ export default function CommissionerPanel() {
 
   async function updatePreset(value: string) {
     setPayoutPreset(value);
-    await api.patch(`/commissioner/${leagueId}/settings`, { payoutPreset: value });
+    await api.patch("/commissioner/" + leagueId + "/settings", { payoutPreset: value });
     toast("Payout structure updated");
-    // Refresh
-    const res = await api.get<any>(`/commissioner/${leagueId}/panel`);
-    if (res.ok) setData(res.data.data);
+    const res = await api.get<PanelData>("/commissioner/" + leagueId + "/panel");
+    if (res.ok) setData(res.data);
+  }
+
+  async function saveDraftDate() {
+    if (!draftDate) return;
+    setSavingDate(true);
+    const res = await api.patch("/commissioner/" + leagueId + "/settings", { draftStartsAt: draftDate });
+    setSavingDate(false);
+    if (res.ok) {
+      toast("Draft date saved");
+      const fresh = await api.get<PanelData>("/commissioner/" + leagueId + "/panel");
+      if (fresh.ok) setData(fresh.data);
+    }
   }
 
   async function sendNotification() {
     if (!notifTitle || !notifBody) return;
     setSendingNotif(true);
-    const res = await api.post(`/commissioner/${leagueId}/notify`, { title: notifTitle, body: notifBody });
+    const res = await api.post("/commissioner/" + leagueId + "/notify", { title: notifTitle, body: notifBody });
     setSendingNotif(false);
-    if (res.ok) {
-      toast("Notification sent to all members");
-      setNotifTitle("");
-      setNotifBody("");
-    }
+    if (res.ok) { toast("Notification sent to all members"); setNotifTitle(""); setNotifBody(""); }
   }
 
   async function triggerPayouts() {
     if (!confirm("Issue final payouts? This cannot be undone.")) return;
     setTriggeringPayout(true);
-    const res = await api.post(`/commissioner/${leagueId}/trigger-payouts`, {});
+    const res = await api.post("/commissioner/" + leagueId + "/trigger-payouts", {});
     setTriggeringPayout(false);
     if (res.ok) {
       toast("Payouts issued!");
-      const fresh = await api.get<any>(`/commissioner/${leagueId}/panel`);
-      if (fresh.ok) setData(fresh.data.data);
+      const fresh = await api.get<PanelData>("/commissioner/" + leagueId + "/panel");
+      if (fresh.ok) setData(fresh.data);
     } else {
       toast((res as any).error ?? "Failed to issue payouts");
     }
@@ -95,29 +107,47 @@ export default function CommissionerPanel() {
   if (!data) return null;
 
   const payoutsIssued = data.payouts.length > 0;
-  const prizePool = `$${(data.prizePool / 100).toFixed(2)}`;
+  const prizePool = "$" + (data.prizePool / 100).toFixed(2);
 
   return (
     <div style={styles.root}>
       <Navbar />
       <main style={styles.main}>
         <div style={styles.topRow}>
-          <button style={styles.back} onClick={() => navigate(`/leagues/${leagueId}`)}>← {data.league.name}</button>
-          <span style={styles.badge}>Commissioner Panel</span>
+          <button style={styles.back} onClick={() => navigate("/leagues/" + leagueId)}>← {data.league.name}</button>
+          <span style={styles.badge}>League Settings</span>
         </div>
 
         <div style={styles.grid}>
-          {/* League info */}
           <Card title="League Info">
             <InfoRow label="Status" value={data.league.status} />
             <InfoRow label="Scoring" value={data.league.scoringType.replace("_", " ")} />
             <InfoRow label="Draft" value={data.league.draftType} />
-            <InfoRow label="Buy-in" value={`$${(data.league.buyIn / 100).toFixed(2)}`} />
+            <InfoRow label="Buy-in" value={"$" + (data.league.buyIn / 100).toFixed(2)} />
             <InfoRow label="Invite code" value={data.league.inviteCode} mono copyable />
           </Card>
 
-          {/* Members */}
-          <Card title={`Members (${data.teams.length})`}>
+          <Card title="Draft Date">
+            <p style={styles.hint}>Set the scheduled date and time for the draft.</p>
+            <div style={styles.dateRow}>
+              <input
+                type="datetime-local"
+                style={styles.dateInput}
+                value={draftDate}
+                onChange={(e) => setDraftDate(e.target.value)}
+              />
+              <Button onClick={saveDraftDate} loading={savingDate} style={{ fontSize: "13px", padding: "8px 16px" }}>
+                Save
+              </Button>
+            </div>
+            {data.league.draftStartsAt && (
+              <p style={{ fontSize: "12px", color: "var(--color-success)", marginTop: "8px" }}>
+                ✓ Scheduled for {new Date(data.league.draftStartsAt).toLocaleString()}
+              </p>
+            )}
+          </Card>
+
+          <Card title={"Members (" + data.teams.length + ")"}>
             {data.teams.map((t) => (
               <div key={t.id} style={styles.memberRow}>
                 <div>
@@ -131,8 +161,7 @@ export default function CommissionerPanel() {
             ))}
           </Card>
 
-          {/* Prize pool + payouts */}
-          <Card title={`Prize Pool — ${prizePool}`}>
+          <Card title={"Prize Pool — " + prizePool}>
             <div style={styles.presetRow}>
               <label style={styles.label}>Payout structure</label>
               <select
@@ -144,33 +173,24 @@ export default function CommissionerPanel() {
                 {PRESET_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
-
             <div style={styles.payoutList}>
               {data.payoutPreview.map((p) => (
                 <div key={p.place} style={styles.payoutRow}>
                   <span style={styles.placeLabel}>{PLACE_LABELS[p.place - 1]}</span>
-                  <span style={styles.payoutAmt}>${(p.amountCents / 100).toFixed(2)}</span>
+                  <span style={styles.payoutAmt}>{"$" + (p.amountCents / 100).toFixed(2)}</span>
                 </div>
               ))}
             </div>
-
             {payoutsIssued ? (
               <div style={styles.payoutsIssued}>
                 <span style={styles.checkmark}>✓</span>
                 <p style={styles.issuedLabel}>Payouts issued</p>
                 {data.payouts.map((p) => (
-                  <p key={p.id} style={styles.issuedLine}>
-                    @{p.user.username} — ${(p.amountCents / 100).toFixed(2)}
-                  </p>
+                  <p key={p.id} style={styles.issuedLine}>@{p.user.username} — {"$" + (p.amountCents / 100).toFixed(2)}</p>
                 ))}
               </div>
             ) : (
-              <Button
-                onClick={triggerPayouts}
-                loading={triggeringPayout}
-                disabled={data.league.status !== "PLAYOFFS"}
-                style={{ marginTop: "16px", width: "100%" }}
-              >
+              <Button onClick={triggerPayouts} loading={triggeringPayout} disabled={data.league.status !== "PLAYOFFS"} style={{ marginTop: "16px", width: "100%" }}>
                 Issue Payouts
               </Button>
             )}
@@ -179,9 +199,10 @@ export default function CommissionerPanel() {
             )}
           </Card>
 
-          {/* Standings snapshot */}
           <Card title="Current Standings">
-            {data.standings.map((s, i) => (
+            {data.standings.length === 0 ? (
+              <p style={styles.hint}>No games played yet</p>
+            ) : data.standings.map((s, i) => (
               <div key={s.teamId} style={styles.standingRow}>
                 <span style={styles.rank}>{i + 1}</span>
                 <span style={{ flex: 1, fontSize: "13px" }}>{s.teamName}</span>
@@ -191,25 +212,11 @@ export default function CommissionerPanel() {
             ))}
           </Card>
 
-          {/* Blast notification */}
           <Card title="Message All Members" span2>
             <div style={styles.notifForm}>
-              <input
-                style={styles.input}
-                placeholder="Title"
-                value={notifTitle}
-                onChange={(e) => setNotifTitle(e.target.value)}
-              />
-              <textarea
-                style={styles.textarea}
-                placeholder="Message body…"
-                value={notifBody}
-                onChange={(e) => setNotifBody(e.target.value)}
-                rows={3}
-              />
-              <Button onClick={sendNotification} loading={sendingNotif} disabled={!notifTitle || !notifBody}>
-                Send Notification
-              </Button>
+              <input style={styles.input} placeholder="Title" value={notifTitle} onChange={(e) => setNotifTitle(e.target.value)} />
+              <textarea style={styles.textarea} placeholder="Message body…" value={notifBody} onChange={(e) => setNotifBody(e.target.value)} rows={3} />
+              <Button onClick={sendNotification} loading={sendingNotif} disabled={!notifTitle || !notifBody}>Send Notification</Button>
             </div>
           </Card>
         </div>
@@ -271,7 +278,7 @@ const styles: Record<string, React.CSSProperties> = {
   checkmark: { fontSize: "20px" },
   issuedLabel: { fontSize: "14px", fontWeight: 700, color: "var(--color-success)" },
   issuedLine: { fontSize: "13px", color: "var(--color-text-muted)" },
-  hint: { fontSize: "12px", color: "var(--color-text-muted)", textAlign: "center" as const },
+  hint: { fontSize: "12px", color: "var(--color-text-muted)" },
   standingRow: { display: "flex", alignItems: "center", gap: "10px", padding: "7px 0", borderBottom: "1px solid var(--color-border)" },
   rank: { fontSize: "13px", fontWeight: 700, color: "var(--color-text-muted)", width: "20px" },
   record: { fontSize: "13px", color: "var(--color-text-muted)", minWidth: "40px", textAlign: "right" as const },
@@ -279,4 +286,6 @@ const styles: Record<string, React.CSSProperties> = {
   notifForm: { display: "flex", flexDirection: "column" as const, gap: "10px" },
   input: { background: "var(--color-surface-2)", border: "1px solid var(--color-border)", borderRadius: "8px", color: "var(--color-text)", padding: "10px 14px", fontSize: "14px", fontFamily: "var(--font)" },
   textarea: { background: "var(--color-surface-2)", border: "1px solid var(--color-border)", borderRadius: "8px", color: "var(--color-text)", padding: "10px 14px", fontSize: "14px", fontFamily: "var(--font)", resize: "vertical" as const },
+  dateRow: { display: "flex", gap: "10px", alignItems: "center" },
+  dateInput: { flex: 1, background: "var(--color-surface-2)", border: "1px solid var(--color-border)", borderRadius: "8px", color: "var(--color-text)", padding: "10px 14px", fontSize: "14px", fontFamily: "var(--font)" },
 };

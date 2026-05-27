@@ -15,11 +15,13 @@ export interface League {
   inviteCode: string;
   memberCount: number;
   createdAt: string;
+  draftStartsAt?: string | null;
   // joined-league extras
   teamId?: string;
   teamName?: string;
   paid?: boolean;
   isCommissioner?: boolean;
+  draftOrder?: number | null;
 }
 
 export interface LeagueDetail extends League {
