@@ -149,7 +149,7 @@ export default function DraftRoom() {
 const SLOT_ORDER = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K", "DEF", "BENCH", "BENCH", "BENCH", "BENCH", "BENCH", "BENCH"];
 
 const POS_COLORS: Record<string, string> = {
-  QB: "#f59e0b", RB: "#22c55e", WR: "#4f7cff", TE: "#a78bfa", K: "#6b7280", DEF: "#ef4444", FLEX: "#22c55e", BENCH: "#374151",
+  QB: "#e74c3c", RB: "#1A2A8E", WR: "#00D4FF", TE: "#FF6B00", K: "#A0B0C0", DEF: "#27AE60", FLEX: "#1A2A8E", BENCH: "#374151",
 };
 
 function MyRoster({ roster, draftType, budget }: { roster: { playerId: string; slot: string }[]; draftType: string; budget?: number }) {

@@ -12,7 +12,6 @@ const STATS_TTL = 6 * 60 * 60 * 1000;     // 6 hr
 let projCache: Record<string, any> = {};
 let projCacheAt = 0;
 const PROJ_TTL = 6 * 60 * 60 * 1000;      // 6 hr
-const newsCache = new Map<string, { data: any[]; at: number }>();
 const NEWS_TTL = 10 * 60 * 1000;          // 10 min — news stays fresh
 const SKILL = new Set(["QB", "RB", "WR", "TE", "K", "DEF"]);
 const NFL_GAMES = 17;
@@ -39,7 +38,7 @@ async function getPlayers(): Promise<any[]> {
 async function getStats(): Promise<Record<string, any>> {
   if (statsCacheAt && Date.now() - statsCacheAt < STATS_TTL) return statsCache;
   try {
-    const { data } = await axios.get("https://api.sleeper.app/v1/stats/nfl/regular/2024/0", { timeout: 15000 });
+    const { data } = await axios.get("https://api.sleeper.app/v1/stats/nfl/regular/2025/0", { timeout: 15000 });
     statsCache = data ?? {};
   } catch { statsCache = {}; }
   statsCacheAt = Date.now();
@@ -56,24 +55,6 @@ async function getProjections(): Promise<Record<string, any>> {
   return projCache;
 }
 
-async function getPlayerNews(espnId: string): Promise<any[]> {
-  const cached = newsCache.get(espnId);
-  if (cached && Date.now() - cached.at < NEWS_TTL) return cached.data;
-  try {
-    const { data } = await axios.get(
-      `https://site.api.espn.com/apis/common/v3/sports/football/nfl/athletes/${espnId}/news`,
-      { timeout: 5000 }
-    );
-    const items = (data?.feed ?? []).slice(0, 6).map((item: any) => ({
-      headline: item.headline ?? "",
-      description: item.description ?? "",
-      published: item.published ?? "",
-      link: item.links?.web?.href ?? null,
-    }));
-    newsCache.set(espnId, { data: items, at: Date.now() });
-    return items;
-  } catch { return []; }
-}
 
 function ptsHalf(s: any): number {
   if (!s) return 0;
@@ -173,7 +154,7 @@ router.get("/:id", async (req, res) => {
     if (!player) return res.status(404).json({ ok: false, error: "Not found" });
     const [stats, proj] = await Promise.all([getStats(), getProjections()]);
     const detail = formatPlayer(player, stats, proj);
-    const news   = player.espn_id ? await getPlayerNews(String(player.espn_id)) : [];
+    const news: any[] = [];
     res.json({ ok: true, data: { ...detail, news } });
   } catch (err) {
     console.error("GET /players/:id:", err);

@@ -15,8 +15,8 @@ interface Player {
 type Phase = "setup" | "drafting" | "complete";
 
 const POS_COLORS: Record<string, string> = {
-  QB: "#e74c3c", RB: "#2ecc71", WR: "#3498db",
-  TE: "#f39c12", K: "#9b59b6", DEF: "#1abc9c",
+  QB: "#e74c3c", RB: "#1A2A8E", WR: "#00D4FF",
+  TE: "#FF6B00", K: "#A0B0C0", DEF: "#27AE60",
 };
 
 const POS_ORDER = ["QB", "RB", "WR", "TE", "K", "DEF"];

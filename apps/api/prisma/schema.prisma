@@ -58,6 +58,7 @@ model User {
   username         String   @unique
   passwordHash     String
   stripeCustomerId String?
+  isAdmin          Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -309,4 +310,14 @@ model DraftState {
   updatedAt DateTime @updatedAt
 
   league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+}
+
+// ------ Rivyl Rankings ------------------------------------------
+
+model PlayerRanking {
+  id         String   @id @default(cuid())
+  playerId   String   @unique
+  rank       Int
+  notes      String?
+  updatedAt  DateTime @updatedAt
 }

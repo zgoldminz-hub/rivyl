@@ -1,7 +1,7 @@
 import { DraftStateData } from "../../store/draft";
 
 const POS_COLORS: Record<string, string> = {
-  QB: "#f59e0b", RB: "#22c55e", WR: "#4f7cff", TE: "#a78bfa", K: "#6b7280", DEF: "#ef4444",
+  QB: "#e74c3c", RB: "#1A2A8E", WR: "#00D4FF", TE: "#FF6B00", K: "#A0B0C0", DEF: "#27AE60",
 };
 
 interface Props {

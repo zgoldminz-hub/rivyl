@@ -83,6 +83,7 @@ export default function Navbar() {
             <NavLink to="/dashboard" active={isActive("/dashboard")}>My Leagues</NavLink>
             <NavLink to="/discover" active={isActive("/discover")}>Discover</NavLink>
             <NavLink to="/players" active={isActive("/players") || isActive("/mock-draft")}>Players</NavLink>
+          <NavLink to="/rankings" active={isActive("/rankings")}>Rivyl Rankings</NavLink>
           </nav>
         </div>
         <div style={styles.right}>

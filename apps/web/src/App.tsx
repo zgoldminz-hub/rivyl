@@ -16,7 +16,9 @@ import WaiverWire from "./pages/WaiverWire";
 import Trades from "./pages/Trades";
 import Profile from "./pages/Profile";
 import Players from "./pages/Players";
+import Rankings from "./pages/Rankings";
 import MockDraft from "./pages/MockDraft";
+
 import Toast from "./components/Toast";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -61,6 +63,7 @@ export default function App() {
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
         <Route path="/players" element={<PrivateRoute><Players /></PrivateRoute>} />
         <Route path="/mock-draft" element={<PrivateRoute><MockDraft /></PrivateRoute>} />
+          <Route path="/rankings" element={<PrivateRoute><Rankings /></PrivateRoute>} />
       </Routes>
     </BrowserRouter>
     </ErrorBoundary>
