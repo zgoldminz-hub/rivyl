@@ -21,8 +21,9 @@ const app = express();
 const httpServer = http.createServer(app);
 const PORT = process.env.PORT ?? 4000;
 const CLIENT_URL = process.env.CLIENT_URL ?? "http://localhost:5173";
+const allowedOrigins = CLIENT_URL.split(",").map(s => s.trim());
 
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 
 // Stripe webhooks need raw body — register before express.json()
 app.use("/webhooks", express.raw({ type: "application/json" }), webhooksRouter);
