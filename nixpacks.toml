@@ -1,0 +1,8 @@
+[phases.install]
+cmds = ["npm install -g pnpm && pnpm install"]
+
+[phases.build]
+cmds = ["pnpm --filter @rivyl/web build"]
+
+[start]
+cmd = "npx serve apps/web/dist -l $PORT"
