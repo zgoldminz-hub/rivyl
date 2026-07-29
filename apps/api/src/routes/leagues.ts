@@ -151,7 +151,31 @@ router.post(
     const intent = await stripe.paymentIntents.create({
       amount: league.buyIn,
       currency: "usd",
+      payment_method_types: ["card", "us_bank_account"],
       metadata: { leagueId: league.id, userId: req.userId!, teamName: req.body.teamName },
+      description: `Rivyl buy-in: ${league.name} ($${buyInDollars})`,
+    });
+    res.status(201).json({ ok: true, data: { clientSecret: intent.client_secret, amount: buyInDollars } });
+  }
+);
+
+
+// ─── POST /leagues/:id/pay-buyin — existing member pays their buy-in ──────────
+router.post(
+  "/:id/pay-buyin",
+  [param("id").notEmpty()],
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const league = await prisma.league.findUnique({ where: { id: req.params.id } });
+    if (!league) { res.status(404).json({ ok: false, error: "League not found" }); return; }
+    const team = await prisma.team.findUnique({ where: { leagueId_userId: { leagueId: league.id, userId: req.userId! } } });
+    if (!team) { res.status(404).json({ ok: false, error: "You are not in this league" }); return; }
+    if (team.paid) { res.status(400).json({ ok: false, error: "Already paid" }); return; }
+    const buyInDollars = league.buyIn / 100;
+    const intent = await stripe.paymentIntents.create({
+      amount: league.buyIn,
+      currency: "usd",
+      payment_method_types: ["card", "us_bank_account"],
+      metadata: { leagueId: league.id, userId: req.userId!, teamId: team.id, type: "MEMBER_BUYIN" },
       description: `Rivyl buy-in: ${league.name} ($${buyInDollars})`,
     });
     res.status(201).json({ ok: true, data: { clientSecret: intent.client_secret, amount: buyInDollars } });

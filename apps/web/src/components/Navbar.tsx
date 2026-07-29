@@ -78,11 +78,10 @@ export default function Navbar() {
     <>
       <header style={styles.header}>
         <div style={styles.left}>
-          <Link to="/dashboard" style={styles.logo}>Rivyl</Link>
+          <Link to="/dashboard" style={styles.logoLink}><img src="/logo.png" alt="Rivyl" style={styles.logoImg} /></Link>
           <nav style={styles.nav}>
             <NavLink to="/dashboard" active={isActive("/dashboard")}>My Leagues</NavLink>
             <NavLink to="/discover" active={isActive("/discover")}>Discover</NavLink>
-            <NavLink to="/players" active={isActive("/players") || isActive("/mock-draft")}>Players</NavLink>
           <NavLink to="/rankings" active={isActive("/rankings")}>Rivyl Rankings</NavLink>
           </nav>
         </div>
@@ -182,7 +181,8 @@ const styles: Record<string, React.CSSProperties> = {
     background: "var(--color-surface)", position: "sticky", top: 0, zIndex: 100,
   },
   left: { display: "flex", alignItems: "center", gap: "32px" },
-  logo: { fontSize: "20px", fontWeight: 700, background: "linear-gradient(90deg, var(--color-accent), var(--color-crimson))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "-0.5px", textDecoration: "none" },
+  logoLink: { textDecoration: "none", display: "flex", alignItems: "center" },
+  logoImg: { height: "36px", width: "auto" },
   nav: { display: "flex", gap: "24px", alignItems: "center" },
   right: { display: "flex", alignItems: "center", gap: "16px" },
   userMenu: { display: "flex", alignItems: "center", gap: "12px" },

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import Navbar from "../components/Navbar";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
@@ -89,7 +89,7 @@ export default function LeaguePage() {
             amount={buyInAmount}
             maxTeams={league.maxTeams}
             leagueName={league.name}
-            onSuccess={() => { setClientSecret(null); fetchLeague(); }}
+            onSuccess={() => { setClientSecret(null); setTimeout(() => fetchLeague(), 1500); }}
             onClose={() => setClientSecret(null)}
           />
         </Elements>
@@ -171,9 +171,6 @@ export default function LeaguePage() {
                   </div>
                   <div style={styles.teamRight}>
                     {team.isCommissioner && <span style={styles.commBadge}>Commissioner</span>}
-                    <span style={{ ...styles.paidBadge, background: team.paid ? "rgba(34,197,94,0.15)" : "rgba(192,57,43,0.1)", color: team.paid ? "var(--color-success)" : "var(--color-danger)" }}>
-                      {team.paid ? "Paid" : "Pending"}
-                    </span>
                   </div>
                 </div>
               ))}
@@ -221,70 +218,6 @@ export default function LeaguePage() {
           </div>
         </form>
       </Modal>
-    </div>
-  );
-}
-
-function PaymentModal({ amount, maxTeams, leagueName, onSuccess, onClose }: {
-  clientSecret: string;
-  amount: number;
-  maxTeams: number;
-  leagueName: string;
-  onSuccess: () => void;
-  onClose: () => void;
-}) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const totalPot = amount * maxTeams;
-  const fee = totalPot - Math.floor(totalPot * 0.95);
-  const prizePool = totalPot - fee;
-
-  async function handlePay(e: React.FormEvent) {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-    setError(null);
-    setLoading(true);
-    const { error: stripeErr } = await stripe.confirmPayment({ elements, redirect: "if_required" });
-    setLoading(false);
-    if (stripeErr) { setError(stripeErr.message ?? "Payment failed"); } else { onSuccess(); }
-  }
-
-  return (
-    <div style={payStyles.overlay}>
-      <div style={payStyles.modal}>
-        <div style={payStyles.header}>
-          <span style={payStyles.title}>Pay Buy-In — {leagueName}</span>
-          <button style={payStyles.close} onClick={onClose}>✕</button>
-        </div>
-        <div style={payStyles.body}>
-          <div style={payStyles.breakdown}>
-            <div style={payStyles.breakdownRow}>
-              <span style={payStyles.breakdownLabel}>Buy-In</span>
-              <span style={payStyles.breakdownValue}>{"$" + amount}</span>
-            </div>
-            <div style={payStyles.breakdownRow}>
-              <span style={payStyles.breakdownLabel}>{"Total Pot (" + maxTeams + " teams)"}</span>
-              <span style={payStyles.breakdownValue}>{"$" + totalPot.toLocaleString()}</span>
-            </div>
-            <div style={payStyles.breakdownRow}>
-              <span style={payStyles.breakdownLabel}>Platform Fee (5%)</span>
-              <span style={{ ...payStyles.breakdownValue, color: "var(--color-text-muted)" }}>{"-$" + fee.toLocaleString()}</span>
-            </div>
-            <div style={{ ...payStyles.breakdownRow, borderTop: "1px solid var(--color-border)", paddingTop: "10px", marginTop: "4px" }}>
-              <span style={{ ...payStyles.breakdownLabel, fontWeight: 600, color: "var(--color-text)" }}>Prize Pool</span>
-              <span style={{ ...payStyles.breakdownValue, color: "var(--color-success)", fontWeight: 700 }}>{"$" + prizePool.toLocaleString()}</span>
-            </div>
-          </div>
-          <form onSubmit={handlePay} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            <PaymentElement />
-            {error && <p style={{ fontSize: "13px", color: "var(--color-danger)" }}>{error}</p>}
-            <Button type="submit" loading={loading}>{"Pay $" + amount}</Button>
-          </form>
-        </div>
-      </div>
     </div>
   );
 }
@@ -347,15 +280,124 @@ const styles: Record<string, React.CSSProperties> = {
   feeValue: { fontSize: "13px", color: "var(--color-text)", fontWeight: 500 },
 };
 
+
+const CARD_STYLE = {
+  style: {
+    base: { color: "#fff", fontFamily: "inherit", fontSize: "15px", "::placeholder": { color: "#666" } },
+    invalid: { color: "#ef4444" },
+  },
+};
+
+function PaymentModal({ clientSecret, amount, maxTeams, leagueName, onSuccess, onClose }: {
+  clientSecret: string;
+  amount: number;
+  maxTeams: number;
+  leagueName: string;
+  onSuccess: () => void;
+  onClose: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [method, setMethod] = useState<"card" | "bank">("card");
+  const [bankName, setBankName] = useState("");
+  const [bankRouting, setBankRouting] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+
+  const totalPot = amount * maxTeams;
+  const fee = totalPot - Math.floor(totalPot * 0.95);
+  const prizePool = totalPot - fee;
+
+  async function handlePay(e: React.FormEvent) {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setError(null);
+    setLoading(true);
+    if (method === "card") {
+      const card = elements.getElement(CardElement);
+      if (!card) { setError("Card element not found"); setLoading(false); return; }
+      const { error: stripeErr } = await stripe.confirmCardPayment(clientSecret, { payment_method: { card } });
+      setLoading(false);
+      if (stripeErr) { setError(stripeErr.message ?? "Payment failed"); } else { onSuccess(); }
+    } else {
+      const { error: stripeErr } = await (stripe as any).confirmUsBankAccountPayment(clientSecret, {
+        payment_method: {
+          us_bank_account: { routing_number: bankRouting, account_number: bankAccount, account_holder_type: "individual" },
+          billing_details: { name: bankName },
+        },
+      });
+      setLoading(false);
+      if (stripeErr) { setError(stripeErr.message ?? "Payment failed"); } else { onSuccess(); }
+    }
+  }
+
+  return (
+    <div style={payStyles.overlay}>
+      <div style={payStyles.modal}>
+        <div style={payStyles.header}>
+          <span style={payStyles.title}>Pay Buy-In — {leagueName}</span>
+          <button style={payStyles.close} onClick={onClose}>✕</button>
+        </div>
+        <div style={payStyles.body}>
+          <div style={payStyles.breakdown}>
+            <div style={payStyles.breakdownRow}>
+              <span style={payStyles.breakdownLabel}>Buy-In</span>
+              <span style={payStyles.breakdownValue}>{"$" + amount}</span>
+            </div>
+            <div style={payStyles.breakdownRow}>
+              <span style={payStyles.breakdownLabel}>{"Total Pot (" + maxTeams + " teams)"}</span>
+              <span style={payStyles.breakdownValue}>{"$" + totalPot.toLocaleString()}</span>
+            </div>
+            <div style={payStyles.breakdownRow}>
+              <span style={payStyles.breakdownLabel}>Platform Fee (5%)</span>
+              <span style={{ ...payStyles.breakdownValue, color: "var(--color-text-muted)" }}>{"-$" + fee.toLocaleString()}</span>
+            </div>
+            <div style={{ ...payStyles.breakdownRow, borderTop: "1px solid var(--color-border)", paddingTop: "10px", marginTop: "4px" }}>
+              <span style={{ ...payStyles.breakdownLabel, fontWeight: 600, color: "var(--color-text)" }}>Prize Pool</span>
+              <span style={{ ...payStyles.breakdownValue, color: "var(--color-success)", fontWeight: 700 }}>{"$" + prizePool.toLocaleString()}</span>
+            </div>
+          </div>
+          <form onSubmit={handlePay} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <div style={payStyles.tabs}>
+              <button type="button" style={{ ...payStyles.tab, ...(method === "card" ? payStyles.tabActive : {}) }} onClick={() => setMethod("card")}>Card</button>
+              <button type="button" style={{ ...payStyles.tab, ...(method === "bank" ? payStyles.tabActive : {}) }} onClick={() => setMethod("bank")}>Bank Transfer</button>
+            </div>
+            {method === "card" ? (
+              <div style={payStyles.cardWrap}>
+                <CardElement options={CARD_STYLE} />
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <input placeholder="Account holder name" value={bankName} onChange={(e) => setBankName(e.target.value)} style={payStyles.bankInput} required />
+                <input placeholder="Routing number (9 digits)" value={bankRouting} onChange={(e) => setBankRouting(e.target.value)} style={payStyles.bankInput} required maxLength={9} />
+                <input placeholder="Account number" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} style={payStyles.bankInput} required />
+                <p style={{ fontSize: "11px", color: "var(--color-text-muted)", margin: 0 }}>Bank transfers require 1–2 business days to verify.</p>
+              </div>
+            )}
+            {error && <p style={{ fontSize: "13px", color: "var(--color-danger)", margin: 0 }}>{error}</p>}
+            <Button type="submit" loading={loading}>{"Pay $" + amount}</Button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const payStyles: Record<string, React.CSSProperties> = {
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1001, padding: "24px" },
   modal: { width: "100%", maxWidth: "480px", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius)", overflow: "hidden" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", borderBottom: "1px solid var(--color-border)" },
   title: { fontWeight: 600, fontSize: "16px" },
   close: { background: "none", border: "none", color: "var(--color-text-muted)", fontSize: "16px", cursor: "pointer" },
-  body: { padding: "24px", display: "flex", flexDirection: "column", gap: "20px" },
+  body: { padding: "24px", display: "flex", flexDirection: "column", gap: "16px" },
   breakdown: { background: "var(--color-surface-2)", borderRadius: "var(--radius)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: "8px" },
   breakdownRow: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   breakdownLabel: { fontSize: "13px", color: "var(--color-text-muted)" },
   breakdownValue: { fontSize: "13px", color: "var(--color-text)", fontWeight: 500 },
+  tabs: { display: "flex", gap: "8px" },
+  tab: { flex: 1, padding: "9px", background: "var(--color-surface-2)", border: "1px solid var(--color-border)", borderRadius: "var(--radius)", color: "var(--color-text-muted)", fontSize: "14px", cursor: "pointer" },
+  tabActive: { background: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#fff" },
+  cardWrap: { padding: "12px 14px", background: "var(--color-surface-2)", border: "1px solid var(--color-border)", borderRadius: "var(--radius)" },
+  bankInput: { width: "100%", padding: "10px 12px", background: "var(--color-surface-2)", border: "1px solid var(--color-border)", borderRadius: "var(--radius)", color: "var(--color-text)", fontSize: "14px", boxSizing: "border-box" },
 };

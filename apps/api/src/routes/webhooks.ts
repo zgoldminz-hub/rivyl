@@ -28,7 +28,16 @@ router.post("/stripe", async (req: Request, res: Response): Promise<void> => {
   switch (event.type) {
     case "payment_intent.succeeded": {
       const intent = event.data.object as any;
-      const { leagueId, userId, teamName } = intent.metadata;
+      const { leagueId, userId, teamName, teamId, type } = intent.metadata;
+
+      if (type === "MEMBER_BUYIN") {
+        await prisma.team.update({ where: { id: teamId }, data: { paid: true } });
+        await prisma.payment.create({
+          data: { leagueId, userId, amountCents: intent.amount, type: "BUY_IN", status: "COMPLETED", stripePaymentIntentId: intent.id },
+        });
+        console.log(`Member buy-in confirmed: team=${teamId}`);
+        break;
+      }
 
       // Verify league still has room (race condition guard)
       const league = await prisma.league.findUnique({

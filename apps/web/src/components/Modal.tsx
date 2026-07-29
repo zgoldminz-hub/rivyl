@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 
 interface Props {
@@ -10,11 +10,27 @@ interface Props {
 }
 
 export default function Modal({ open, onClose, title, children, width = 520 }: Props) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
+
     const handler = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+
+    const preventScroll = (e: WheelEvent | TouchEvent) => {
+      if (bodyRef.current && bodyRef.current.contains(e.target as Node)) return;
+      e.preventDefault();
+    };
+
+    document.addEventListener("wheel", preventScroll, { passive: false });
+    document.addEventListener("touchmove", preventScroll, { passive: false });
+
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.removeEventListener("wheel", preventScroll);
+      document.removeEventListener("touchmove", preventScroll);
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -26,7 +42,7 @@ export default function Modal({ open, onClose, title, children, width = 520 }: P
           <span style={styles.title}>{title}</span>
           <button style={styles.close} onClick={onClose}>✕</button>
         </div>
-        <div style={styles.body}>{children}</div>
+        <div ref={bodyRef} style={styles.body}>{children}</div>
       </div>
     </div>,
     document.body
@@ -49,7 +65,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: "var(--color-surface)",
     border: "1px solid var(--color-border)",
     borderRadius: "var(--radius)",
-    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
+    maxHeight: "calc(100vh - 48px)",
   },
   header: {
     display: "flex",
@@ -57,6 +75,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     padding: "18px 24px",
     borderBottom: "1px solid var(--color-border)",
+    flexShrink: 0,
   },
   title: {
     fontWeight: 600,
@@ -72,5 +91,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   body: {
     padding: "24px",
+    overflowY: "auto",
+    flex: 1,
   },
 };

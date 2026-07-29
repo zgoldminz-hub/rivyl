@@ -61,7 +61,7 @@ export default function App() {
         <Route path="/leagues/:id/waivers" element={<PrivateRoute><WaiverWire /></PrivateRoute>} />
         <Route path="/leagues/:id/trades" element={<PrivateRoute><Trades /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-        <Route path="/players" element={<PrivateRoute><Players /></PrivateRoute>} />
+        <Route path="/players" element={<Navigate to="/rankings" replace />} />
         <Route path="/mock-draft" element={<PrivateRoute><MockDraft /></PrivateRoute>} />
           <Route path="/rankings" element={<PrivateRoute><Rankings /></PrivateRoute>} />
       </Routes>

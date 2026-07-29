@@ -12,9 +12,45 @@ const STATS_TTL = 6 * 60 * 60 * 1000;     // 6 hr
 let projCache: Record<string, any> = {};
 let projCacheAt = 0;
 const PROJ_TTL = 6 * 60 * 60 * 1000;      // 6 hr
-const NEWS_TTL = 10 * 60 * 1000;          // 10 min — news stays fresh
 const SKILL = new Set(["QB", "RB", "WR", "TE", "K", "DEF"]);
 const NFL_GAMES = 17;
+
+
+// ─── Yahoo Sports NFL News ────────────────────────────────────────────────────
+let yahooNewsCache: { headline: string; description: string; published: string; link: string | null }[] = [];
+let yahooNewsCacheAt = 0;
+const YAHOO_NEWS_TTL = 10 * 60 * 1000; // 10 min
+
+async function getYahooNFLNews() {
+  if (yahooNewsCache.length && Date.now() - yahooNewsCacheAt < YAHOO_NEWS_TTL) return yahooNewsCache;
+  try {
+    const { data } = await axios.get("https://sports.yahoo.com/nfl/rss/", {
+      timeout: 8000,
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    const items: typeof yahooNewsCache = [];
+    const itemRe = /<item>([\s\S]*?)<\/item>/g;
+    let m;
+    while ((m = itemRe.exec(data)) !== null) {
+      const block = m[1];
+      const title   = /(?:<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>)/.exec(block);
+      const desc    = /(?:<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>)/.exec(block);
+      const pubDate = /<pubDate>(.*?)<\/pubDate>/.exec(block);
+      const link    = /<link>(.*?)<\/link>/.exec(block);
+      items.push({
+        headline:    title   ? title[1].trim()                              : "",
+        description: desc    ? desc[1].replace(/<[^>]*>/g, "").trim()      : "",
+        published:   pubDate ? new Date(pubDate[1].trim()).toISOString()    : "",
+        link:        link    ? link[1].trim()                               : null,
+      });
+    }
+    yahooNewsCache   = items;
+    yahooNewsCacheAt = Date.now();
+    return items;
+  } catch {
+    return yahooNewsCache;
+  }
+}
 
 async function getPlayers(): Promise<any[]> {
   if (playersCache && Date.now() - playersCacheAt < PLAYERS_TTL) return playersCache;
@@ -154,7 +190,13 @@ router.get("/:id", async (req, res) => {
     if (!player) return res.status(404).json({ ok: false, error: "Not found" });
     const [stats, proj] = await Promise.all([getStats(), getProjections()]);
     const detail = formatPlayer(player, stats, proj);
-    const news: any[] = [];
+    const allNews = await getYahooNFLNews();
+    const fullName  = player.full_name ?? "";
+    const lastName  = fullName.split(" ").slice(1).join(" ");
+    const news = allNews.filter(n => {
+      const h = n.headline.replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+      return lastName && (h.includes(lastName) || h.includes(fullName));
+    }).slice(0, 5);
     res.json({ ok: true, data: { ...detail, news } });
   } catch (err) {
     console.error("GET /players/:id:", err);

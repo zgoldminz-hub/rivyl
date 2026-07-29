@@ -13,6 +13,7 @@ import waiversRouter from "./routes/waivers";
 import tradesRouter from "./routes/trades";
 import profileRouter from "./routes/profile";
 import playersRouter from "./routes/players";
+import rankingsRouter from "./routes/rankings";
 import { initDraftSocket } from "./ws/draftSocket";
 import { restoreActiveDrafts } from "./lib/draftEngine";
 
@@ -40,6 +41,7 @@ app.use("/waivers", waiversRouter);
 app.use("/trades", tradesRouter);
 app.use("/profile", profileRouter);
 app.use("/players", playersRouter);
+app.use("/rankings", rankingsRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true, data: { status: "healthy" } }));
 
