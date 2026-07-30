@@ -43,6 +43,7 @@ export default function CreateLeagueModal({ open, onClose }: Props) {
   const afterFee = Math.floor(totalPot * 0.95);
 
   async function handleSubmit(e: React.FormEvent) {
+    if (loading) return;
     e.preventDefault();
     setError(null);
     setLoading(true);
