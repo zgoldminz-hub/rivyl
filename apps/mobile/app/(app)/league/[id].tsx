@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
-import * as Clipboard from "expo-clipboard";
+import { Clipboard } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { api } from "../../../src/api/client";
@@ -55,7 +55,7 @@ export default function LeagueScreen() {
 
   async function copyInviteCode() {
     if (!league?.inviteCode) return;
-    await Clipboard.setStringAsync(league.inviteCode);
+    Clipboard.setString(league.inviteCode);
     Alert.alert("Copied!", "Invite code copied to clipboard.");
   }
 
