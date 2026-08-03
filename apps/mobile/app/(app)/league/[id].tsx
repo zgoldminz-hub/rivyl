@@ -145,3 +145,4 @@ export default function LeagueScreen() {
               </View>
               <View style={styles.teamBadges}>
                 {team.isCommissioner && <Text style={styles.commBadge}>Comm.</Text>}
+              </View>
