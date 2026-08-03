@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, NativeSyntheticEvent, NativeScrollEvent } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../src/store/auth";
@@ -20,11 +21,10 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     api.get<{ leagues: League[] }>("/leagues/mine").then((res) => {
@@ -40,7 +40,6 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.logo}>Rivyl</Text>
         <View style={styles.headerActions}>
@@ -54,8 +53,6 @@ export default function DashboardScreen() {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
-        {/* My Leagues */}
         <Text style={styles.sectionTitle}>My Leagues</Text>
 
         {loading ? (
@@ -68,15 +65,13 @@ export default function DashboardScreen() {
         ) : (
           <View>
             <ScrollView
-              ref={scrollRef}
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               onScroll={onScroll}
               scrollEventThrottle={16}
-              snapToInterval={CARD_WIDTH}
+              snapToInterval={CARD_WIDTH + 12}
               decelerationRate="fast"
-              contentContainerStyle={{ paddingRight: 0 }}
             >
               {leagues.map((league) => (
                 <TouchableOpacity
@@ -93,7 +88,7 @@ export default function DashboardScreen() {
                   </View>
                   {league.myTeam && <Text style={styles.teamName}>{league.myTeam.name}</Text>}
                   <View style={styles.cardMeta}>
-                    <Text style={styles.metaItem}>${league.buyIn} buy-in</Text>
+                    <Text style={styles.entryAmount}>${league.buyIn} entry</Text>
                     <Text style={styles.metaDot}> · </Text>
                     <Text style={styles.metaItem}>{league.memberCount}/{league.maxTeams} teams</Text>
                     <Text style={styles.metaDot}> · </Text>
@@ -105,8 +100,6 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-
-            {/* Dots */}
             {leagues.length > 1 && (
               <View style={styles.dots}>
                 {leagues.map((_, i) => (
@@ -116,26 +109,21 @@ export default function DashboardScreen() {
             )}
           </View>
         )}
-
-        {/* Rankings */}
-        <Text style={[styles.sectionTitle, { marginTop: 28 }]}>Rankings</Text>
-        <TouchableOpacity style={styles.rankingsCard} onPress={() => router.push("/(app)/rankings" as any)} activeOpacity={0.85}>
-          <View>
-            <Text style={styles.rankingsTitle}>Rivyl Rankings</Text>
-            <Text style={styles.rankingsSubtitle}>Player rankings, projections & mock draft</Text>
-          </View>
-          <Text style={styles.rankingsArrow}>→</Text>
-        </TouchableOpacity>
-
       </ScrollView>
 
-      {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity onPress={() => router.push("/(app)/profile" as any)}>
           <Text style={styles.username}>@{user?.username}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={logout}>
-          <Text style={styles.signOut}>Sign out</Text>
+        <TouchableOpacity onPress={() => router.push("/(app)/rankings" as any)} activeOpacity={0.85}>
+          <LinearGradient
+            colors={["#4f7cff", "#9333ea", "#e63946"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.rankingsBtn}
+          >
+            <Text style={styles.rankingsBtnText}>Rivyl Rankings</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -152,7 +140,7 @@ const styles = StyleSheet.create({
   searchBtn: { backgroundColor: "#e63946", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
   searchBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  scrollContent: { padding: 20, paddingBottom: 20 },
   sectionTitle: { fontSize: 18, fontWeight: "700", color: "#e8eaf0", marginBottom: 14 },
   emptyState: { alignItems: "center", marginTop: 40, padding: 24, backgroundColor: "#161b24", borderRadius: 12, borderWidth: 1, borderColor: "#2a3347" },
   emptyTitle: { fontSize: 16, fontWeight: "600", color: "#e8eaf0", marginBottom: 6 },
@@ -164,6 +152,7 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 11, fontWeight: "700" },
   teamName: { fontSize: 13, color: "#8a95a8", marginBottom: 10 },
   cardMeta: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
+  entryAmount: { fontSize: 12, color: "#22c55e", fontWeight: "600" },
   metaItem: { fontSize: 12, color: "#8a95a8" },
   metaDot: { fontSize: 12, color: "#374151" },
   cardArrow: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#2a3347" },
@@ -171,11 +160,8 @@ const styles = StyleSheet.create({
   dots: { flexDirection: "row", justifyContent: "center", marginTop: 12, gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#2a3347" },
   dotActive: { backgroundColor: "#4f7cff", width: 18 },
-  rankingsCard: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 14, padding: 18, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  rankingsTitle: { fontSize: 16, fontWeight: "700", color: "#e8eaf0", marginBottom: 4 },
-  rankingsSubtitle: { fontSize: 13, color: "#8a95a8" },
-  rankingsArrow: { fontSize: 20, color: "#4f7cff", fontWeight: "700" },
   footer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderTopWidth: 1, borderTopColor: "#2a3347" },
   username: { fontSize: 13, color: "#8a95a8" },
-  signOut: { fontSize: 13, color: "#e63946" },
+  rankingsBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
+  rankingsBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 });
