@@ -6,8 +6,11 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../../src/store/auth";
 import { api } from "../../src/api/client";
+import AvatarCharacter from "../../src/components/AvatarCharacter";
+import { AvatarConfig, DEFAULT_AVATAR_CONFIG } from "../../src/constants/avatar-parts";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_W = SCREEN_W - 40;
@@ -28,11 +31,15 @@ export default function DashboardScreen() {
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(DEFAULT_AVATAR_CONFIG);
 
   useEffect(() => {
     api.get<{ leagues: League[] }>("/leagues/mine").then((res) => {
       if (res.ok) setLeagues(res.data.leagues);
       setLoading(false);
+    });
+    AsyncStorage.getItem("avatar_config_v2").then((val) => {
+      if (val) { try { setAvatarConfig(JSON.parse(val)); } catch {} }
     });
   }, []);
 
@@ -131,7 +138,10 @@ export default function DashboardScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity onPress={() => router.push("/(app)/profile" as any)}>
+        <TouchableOpacity style={styles.profileBtn} onPress={() => router.push("/(app)/profile" as any)} activeOpacity={0.8}>
+          <View style={styles.avatarRing}>
+            <AvatarCharacter config={avatarConfig} size={56} />
+          </View>
           <Text style={styles.username}>@{user?.username}</Text>
         </TouchableOpacity>
       </View>
@@ -170,6 +180,8 @@ const styles = StyleSheet.create({
   dots: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 12 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#2a3347" },
   dotActive: { backgroundColor: "#4f7cff", width: 18 },
-  footer: { paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "#2a3347" },
-  username: { fontSize: 14, color: "#8a95a8", fontWeight: "600" },
+  footer: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#2a3347", alignItems: "center" },
+  profileBtn: { alignItems: "center", gap: 4 },
+  avatarRing: { width: 60, height: 60, borderRadius: 30, overflow: "hidden", borderWidth: 2, borderColor: "#4f7cff" },
+  username: { fontSize: 12, color: "#8a95a8", fontWeight: "600" },
 });

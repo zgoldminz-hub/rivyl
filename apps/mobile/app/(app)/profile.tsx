@@ -31,6 +31,17 @@ interface RankInfo {
   description: string;
 }
 
+const RANK_TIERS = [
+  { name: "Rookie",           color: "#6b7280", req: "0\u20139 leagues played",                                                desc: "Every champion starts somewhere. Play in 10+ leagues to begin your Rivyl journey." },
+  { name: "Rising Star",      color: "#3b82f6", req: "10+ leagues played",                                                desc: "Building momentum. Reach 20+ leagues with a 50%+ win rate to become a Contender." },
+  { name: "Contender",        color: "#22c55e", req: "20+ leagues \u00b7 50%+ win rate",                                      desc: "A consistent winner. Drop below 50% win rate and you fall back to Rising Star." },
+  { name: "Pro-Bowler",       color: "#8b5cf6", req: "50+ leagues \u00b7 50%+ win rate \u00b7 1+ runner-up",                      desc: "A serious competitor. You've been to the finals and kept a winning record doing it." },
+  { name: "All-Pro",          color: "#f97316", req: "60+ leagues \u00b7 1+ championship \u00b7 60%+ win rate",                   desc: "Elite of the elite. You've won a championship and maintained an elite win rate." },
+  { name: "Franchise Legend", color: "#ef4444", req: "100+ wins \u00b7 2+ championships",                                    desc: "A dynasty builder. Multiple championships and over 100 all-time wins." },
+  { name: "Hall of Famer",    color: "#f59e0b", req: "200+ wins \u00b7 65%+ win rate \u00b7 5+ top-3 finishes \u00b7 2+ championships", desc: "An all-time great. Sustained excellence over a long career." },
+  { name: "GOAT Status",      color: "#FFD700", req: "300+ wins \u00b7 10 championships",                                    desc: "The pinnacle of Rivyl. There is no higher rank \u2014 you are the greatest of all time." },
+];
+
 function computeRank(stats: Stats): RankInfo {
   const w = stats.regWins;
   const leagues = stats.totalLeagues;
@@ -81,6 +92,7 @@ export default function ProfileScreen() {
   const [config, setConfig] = useState<AvatarConfig>(DEFAULT_AVATAR_CONFIG);
   const [draftConfig, setDraftConfig] = useState<AvatarConfig>(DEFAULT_AVATAR_CONFIG);
   const [showPicker, setShowPicker] = useState(false);
+  const [showAllRanks, setShowAllRanks] = useState(false);
   const [activeCategory, setActiveCategory] = useState<Category>("Skin");
 
   useEffect(() => {
@@ -142,13 +154,18 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           <Text style={styles.username}>@{user?.username}</Text>
           {rank && (
-            <TouchableOpacity
-              onPress={() => showRankInfo(rank)}
-              style={[styles.rankBadge, { backgroundColor: rank.color + "22", borderColor: rank.color + "55" }]}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.rankText, { color: rank.color }]}>{rank.name}</Text>
-            </TouchableOpacity>
+            <View style={styles.rankRow}>
+              <TouchableOpacity
+                onPress={() => showRankInfo(rank)}
+                style={[styles.rankBadge, { backgroundColor: rank.color + "22", borderColor: rank.color + "55" }]}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.rankText, { color: rank.color }]}>{rank.name}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowAllRanks(true)} style={styles.rankInfoBtn} activeOpacity={0.7}>
+                <Text style={styles.rankInfoText}>ⓘ</Text>
+              </TouchableOpacity>
+            </View>
           )}
           <Text style={styles.email}>{user?.email}</Text>
         </View>
@@ -196,6 +213,42 @@ export default function ProfileScreen() {
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* All Ranks Modal */}
+      <Modal visible={showAllRanks} animationType="slide" presentationStyle="pageSheet">
+        <View style={ranksModal.container}>
+          <View style={ranksModal.handle} />
+          <View style={ranksModal.topBar}>
+            <View style={{ width: 50 }} />
+            <Text style={ranksModal.title}>All Ranks</Text>
+            <TouchableOpacity onPress={() => setShowAllRanks(false)}>
+              <Text style={ranksModal.done}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={ranksModal.content}>
+            {RANK_TIERS.map((tier) => {
+              const isCurrent = rank?.name === tier.name;
+              return (
+                <View key={tier.name} style={[ranksModal.tierRow, isCurrent && { backgroundColor: tier.color + "12", borderColor: tier.color + "44" }]}>
+                  <View style={[ranksModal.dot, { backgroundColor: tier.color }]} />
+                  <View style={ranksModal.tierBody}>
+                    <View style={ranksModal.nameRow}>
+                      <Text style={[ranksModal.tierName, { color: tier.color }]}>{tier.name}</Text>
+                      {isCurrent && (
+                        <View style={[ranksModal.youPill, { backgroundColor: tier.color + "33" }]}>
+                          <Text style={[ranksModal.youText, { color: tier.color }]}>YOU</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={ranksModal.req}>{tier.req}</Text>
+                    <Text style={ranksModal.desc}>{tier.desc}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
 
       {/* Avatar Picker Modal */}
       <Modal visible={showPicker} animationType="slide" presentationStyle="pageSheet">
@@ -325,8 +378,11 @@ const styles = StyleSheet.create({
   avatarRing: { width: 120, height: 120, borderRadius: 60, overflow: "hidden", borderWidth: 3, borderColor: "#4f7cff", marginBottom: 6 },
   changeHint: { fontSize: 11, color: "#4f7cff", textAlign: "center", marginBottom: 10 },
   username: { fontSize: 22, fontWeight: "800", color: "#e8eaf0", marginBottom: 8 },
-  rankBadge: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 8 },
+  rankRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  rankBadge: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 5 },
   rankText: { fontSize: 13, fontWeight: "700" },
+  rankInfoBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#1a2133", borderWidth: 1, borderColor: "#2a3347", alignItems: "center", justifyContent: "center" },
+  rankInfoText: { fontSize: 14, color: "#8a95a8" },
   email: { fontSize: 13, color: "#8a95a8" },
   card: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 12, padding: 16, marginBottom: 16 },
   cardTitle: { fontSize: 12, fontWeight: "600", color: "#8a95a8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 },
@@ -380,4 +436,22 @@ const modal = StyleSheet.create({
   hatChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: "#2a3347", minWidth: 80, alignItems: "center" },
   hatChipSel: { borderWidth: 2, borderColor: "#fff" },
   hatChipText: { fontSize: 12, fontWeight: "700" },
+});
+
+const ranksModal = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#0d0f14" },
+  handle: { width: 36, height: 4, backgroundColor: "#2a3347", borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 4 },
+  topBar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#2a3347" },
+  title: { fontSize: 16, fontWeight: "700", color: "#e8eaf0" },
+  done: { fontSize: 15, color: "#4f7cff", fontWeight: "700" },
+  content: { padding: 20, paddingBottom: 60 },
+  tierRow: { flexDirection: "row", gap: 14, borderWidth: 1, borderColor: "#2a3347", borderRadius: 12, padding: 14, marginBottom: 10 },
+  dot: { width: 12, height: 12, borderRadius: 6, marginTop: 4, flexShrink: 0 },
+  tierBody: { flex: 1 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 3 },
+  tierName: { fontSize: 15, fontWeight: "800" },
+  youPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  youText: { fontSize: 10, fontWeight: "800" },
+  req: { fontSize: 12, color: "#4f7cff", fontWeight: "600", marginBottom: 4 },
+  desc: { fontSize: 12, color: "#8a95a8", lineHeight: 17 },
 });
