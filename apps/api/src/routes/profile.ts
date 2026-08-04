@@ -122,6 +122,63 @@ router.delete("/payment-method/:pmId", requireAuth, async (req: AuthRequest, res
   res.json({ ok: true, data: null });
 });
 
+router.get("/trophy-room", requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  const teams = await prisma.team.findMany({
+    where: { userId: req.userId, league: { status: "COMPLETE" } },
+    include: {
+      league: { select: { id: true, name: true, createdAt: true } },
+      homeMatchups: { where: { isPlayoff: true }, select: { week: true, homeScore: true, awayScore: true } },
+      awayMatchups: { where: { isPlayoff: true }, select: { week: true, homeScore: true, awayScore: true } },
+      rosterSlots: { select: { playerId: true, slot: true } },
+    },
+  });
+
+  if (!teams.length) {
+    res.json({ ok: true, data: { trophies: [] } });
+    return;
+  }
+
+  const leagueIds = [...new Set(teams.map(t => t.leagueId))];
+  const leagueMaxWeeks = await prisma.matchup.groupBy({
+    by: ["leagueId"],
+    where: { leagueId: { in: leagueIds }, isPlayoff: true },
+    _max: { week: true },
+  });
+  const maxWeekByLeague: Record<string, number | null> = {};
+  for (const r of leagueMaxWeeks) maxWeekByLeague[r.leagueId] = r._max.week;
+
+  const trophies: {
+    finish: 1 | 2;
+    team: { id: string; name: string };
+    league: { id: string; name: string };
+    year: number;
+    roster: { playerId: string; slot: string }[];
+  }[] = [];
+
+  for (const team of teams) {
+    const champWeek = maxWeekByLeague[team.leagueId];
+    if (!champWeek) continue;
+
+    const allPlayoff = [
+      ...team.homeMatchups.map(m => ({ week: m.week, myScore: m.homeScore, oppScore: m.awayScore })),
+      ...team.awayMatchups.map(m => ({ week: m.week, myScore: m.awayScore, oppScore: m.homeScore })),
+    ];
+
+    const final = allPlayoff.find(m => m.week === champWeek);
+    if (!final) continue;
+
+    trophies.push({
+      finish: final.myScore > final.oppScore ? 1 : 2,
+      team: { id: team.id, name: team.name },
+      league: { id: team.leagueId, name: team.league.name },
+      year: new Date(team.league.createdAt).getFullYear(),
+      roster: team.rosterSlots,
+    });
+  }
+
+  trophies.sort((a, b) => a.finish - b.finish);
+  res.json({ ok: true, data: { trophies } });
+});
 
 router.get("/stats", requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   const teams = await prisma.team.findMany({

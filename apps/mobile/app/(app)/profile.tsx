@@ -182,6 +182,10 @@ export default function ProfileScreen() {
                 <TrophyBadge emoji="🥈" label="Runner-Up" count={stats.runnerUps} color="#9ca3af" />
                 <TrophyBadge emoji="🥉" label="3rd Place" count={0} color="#cd7c32" />
               </View>
+              <View style={{ height: 16 }} />
+              <TouchableOpacity style={styles.trophyRoomBtn} onPress={() => router.push("/(app)/trophy-room")} activeOpacity={0.8}>
+                <Text style={styles.trophyRoomLabel}>Trophy Room</Text>
+              </TouchableOpacity>
             </>
           ) : (
             <Text style={styles.noData}>No stats yet — join a league!</Text>
@@ -342,6 +346,8 @@ const styles = StyleSheet.create({
   trophyCount: { fontSize: 22, fontWeight: "800" },
   trophyLabel: { fontSize: 10, color: "#8a95a8", marginTop: 2 },
   noData: { color: "#8a95a8", textAlign: "center", paddingVertical: 16 },
+  trophyRoomBtn: { backgroundColor: "#3d1c00", borderWidth: 1, borderColor: "#7c3a00", borderRadius: 12, paddingVertical: 15, alignItems: "center" },
+  trophyRoomLabel: { color: "#FFD700", fontSize: 15, fontWeight: "800", letterSpacing: 1.2 },
   signOutBtn: { backgroundColor: "#1a0d0d", borderWidth: 1, borderColor: "#7f1d1d", borderRadius: 12, padding: 16, alignItems: "center", marginTop: 8 },
   signOutText: { color: "#ef4444", fontSize: 15, fontWeight: "700" },
 });
