@@ -13,13 +13,8 @@ const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_W = SCREEN_W - 40;
 
 interface League {
-  id: string;
-  name: string;
-  status: string;
-  buyIn: number;
-  maxTeams: number;
-  memberCount: number;
-  scoringType: string;
+  id: string; name: string; status: string; buyIn: number;
+  maxTeams: number; memberCount: number; scoringType: string;
   myTeam?: { name: string };
 }
 
@@ -51,32 +46,35 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      {/* Header — just logo + Create + Search */}
       <View style={styles.header}>
         <Text style={styles.logo}>Rivyl</Text>
-        <View style={styles.headerRight}>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.createBtn} onPress={() => router.push("/(app)/create-league" as any)}>
-              <Text style={styles.createBtnText}>+ Create</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.searchBtn} onPress={() => router.push("/(app)/discover" as any)}>
-              <Text style={styles.searchBtnText}>Search</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/(app)/rankings" as any)}>
-            <LinearGradient
-              colors={["#ef4444", "#7c3aed", "#4f7cff"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.rankingsHeaderBtn}
-            >
-              <Text style={styles.rankingsHeaderText}>Rivyl Rankings</Text>
-            </LinearGradient>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.createBtn} onPress={() => router.push("/(app)/create-league" as any)}>
+            <Text style={styles.createBtnText}>+ Create</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.searchBtn} onPress={() => router.push("/(app)/discover" as any)}>
+            <Text style={styles.searchBtnText}>Search</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.sectionHeading}>My Leagues</Text>
+
+        {/* My Leagues row with Rankings button on the right */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionHeading}>My Leagues</Text>
+          <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/(app)/rankings" as any)}>
+            <LinearGradient
+              colors={["#ef4444", "#7c3aed", "#4f7cff"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.rankingsBtn}
+            >
+              <Text style={styles.rankingsBtnText}>Rivyl Rankings</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
 
         {loading ? (
           <ActivityIndicator color="#4f7cff" style={{ marginTop: 40 }} />
@@ -143,19 +141,19 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0d0f14" },
-  header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#2a3347", backgroundColor: "#161b24" },
-  logo: { fontSize: 22, fontWeight: "700", color: "#4f7cff", letterSpacing: -0.5, paddingTop: 6 },
-  headerRight: { alignItems: "flex-end", gap: 6 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#2a3347", backgroundColor: "#161b24" },
+  logo: { fontSize: 20, fontWeight: "700", color: "#4f7cff", letterSpacing: -0.5 },
   headerActions: { flexDirection: "row", gap: 8 },
   createBtn: { backgroundColor: "#4f7cff", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
   createBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   searchBtn: { backgroundColor: "#ef4444", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
   searchBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  rankingsHeaderBtn: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
-  rankingsHeaderText: { color: "#fff", fontSize: 13, fontWeight: "700", letterSpacing: 0.3 },
   scroll: { flex: 1 },
   scrollContent: { paddingTop: 20, paddingBottom: 40 },
-  sectionHeading: { fontSize: 20, fontWeight: "700", color: "#e8eaf0", paddingHorizontal: 20, marginBottom: 14 },
+  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, marginBottom: 14 },
+  sectionHeading: { fontSize: 20, fontWeight: "700", color: "#e8eaf0" },
+  rankingsBtn: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  rankingsBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", letterSpacing: 0.3 },
   emptyState: { alignItems: "center", marginTop: 60, paddingHorizontal: 20 },
   emptyTitle: { fontSize: 17, fontWeight: "600", color: "#e8eaf0", marginBottom: 8 },
   emptyBody: { fontSize: 14, color: "#8a95a8", textAlign: "center" },

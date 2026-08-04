@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Modal, FlatList, Alert,
+  ActivityIndicator, Modal, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -25,6 +25,54 @@ interface Stats {
   winPct: number; totalLeagues: number;
 }
 
+interface RankInfo {
+  name: string;
+  color: string;
+  description: string;
+}
+
+function computeRank(stats: Stats): RankInfo {
+  const w = stats.regWins;
+  const leagues = stats.totalLeagues;
+  const wp = stats.winPct;
+  const champs = stats.championships;
+  const runnerUps = stats.runnerUps;
+  const combined = champs + runnerUps;
+
+  if (w >= 300 && champs >= 10) return {
+    name: "GOAT Status", color: "#FFD700",
+    description: "The pinnacle of Rivyl. 300+ wins and 10 championships. There is no higher rank — you are the greatest of all time.",
+  };
+  if (wp >= 65 && w >= 200 && combined >= 5 && champs >= 2) return {
+    name: "Hall of Famer", color: "#f59e0b",
+    description: "An all-time great. Requires 200+ wins, 65%+ win rate, and 5 top-3 finishes with at least 2 championships. Next: GOAT Status (300 wins, 10 championships).",
+  };
+  if (w >= 100 && champs >= 2) return {
+    name: "Franchise Legend", color: "#ef4444",
+    description: "A dynasty builder. Requires 100+ all-time wins and 2 championships. Next: Hall of Famer (200+ wins, 65%+ win rate, 5 top-3 finishes including 2 championships).",
+  };
+  if (leagues >= 60 && champs >= 1 && wp >= 60) return {
+    name: "All-Pro", color: "#f97316",
+    description: "Elite of the elite. Requires 60+ leagues, 1 championship, and 60%+ win rate. Next: Franchise Legend (100+ wins, 2 championships).",
+  };
+  if (leagues >= 50 && wp >= 50 && runnerUps >= 1) return {
+    name: "Pro-Bowler", color: "#8b5cf6",
+    description: "A serious competitor. Requires 50+ leagues, 50%+ win rate, and a runner-up finish. Next: All-Pro (60+ leagues, 1 championship, 60%+ win rate).",
+  };
+  if (leagues >= 20 && wp >= 50) return {
+    name: "Contender", color: "#22c55e",
+    description: "A consistent winner. Requires 20+ leagues and 50%+ win rate. Drop below 50% and you fall back to Rising Star. Next: Pro-Bowler (50+ leagues, runner-up finish).",
+  };
+  if (leagues >= 10) return {
+    name: "Rising Star", color: "#3b82f6",
+    description: "Building momentum. You have 10+ leagues under your belt. Next: Contender (20+ leagues and 50%+ win rate). Drop below 50% and you stay here.",
+  };
+  return {
+    name: "Rookie", color: "#6b7280",
+    description: "Every champion starts somewhere. Play in 10+ leagues to earn Rising Star status and begin your Rivyl journey.",
+  };
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -37,9 +85,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     AsyncStorage.getItem(AVATAR_KEY).then((val) => {
-      if (val) {
-        try { setConfig(JSON.parse(val)); } catch {}
-      }
+      if (val) { try { setConfig(JSON.parse(val)); } catch {} }
     });
     api.get<{ stats: Stats }>("/profile/stats").then((res) => {
       if (res.ok) setStats(res.data.stats);
@@ -69,6 +115,12 @@ export default function ProfileScreen() {
     ]);
   }
 
+  function showRankInfo(rank: RankInfo) {
+    Alert.alert(rank.name, rank.description);
+  }
+
+  const rank = stats ? computeRank(stats) : null;
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -80,7 +132,7 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Avatar */}
+        {/* Avatar + identity */}
         <View style={styles.identityBlock}>
           <TouchableOpacity onPress={openPicker} activeOpacity={0.8}>
             <View style={styles.avatarRing}>
@@ -89,6 +141,15 @@ export default function ProfileScreen() {
             <Text style={styles.changeHint}>Tap to customize</Text>
           </TouchableOpacity>
           <Text style={styles.username}>@{user?.username}</Text>
+          {rank && (
+            <TouchableOpacity
+              onPress={() => showRankInfo(rank)}
+              style={[styles.rankBadge, { backgroundColor: rank.color + "22", borderColor: rank.color + "55" }]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.rankText, { color: rank.color }]}>{rank.name}</Text>
+            </TouchableOpacity>
+          )}
           <Text style={styles.email}>{user?.email}</Text>
         </View>
 
@@ -103,7 +164,7 @@ export default function ProfileScreen() {
                 <StatBox label="W" value={stats.regWins} color="#22c55e" />
                 <StatBox label="L" value={stats.regLosses} color="#ef4444" />
                 <StatBox label="Win %" value={stats.winPct + "%"} color="#4f7cff" />
-                <StatBox label="Experience" value={stats.totalLeagues} sublabel="leagues" color="#a78bfa" />
+                <ExperienceBox count={stats.totalLeagues} />
               </View>
               <View style={styles.divider} />
               <Text style={styles.subLabel}>Playoff Record</Text>
@@ -145,28 +206,18 @@ export default function ProfileScreen() {
               <Text style={modal.save}>Save</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Live preview */}
           <View style={modal.preview}>
             <View style={modal.previewRing}>
               <AvatarCharacter config={draftConfig} size={140} />
             </View>
           </View>
-
-          {/* Category tabs */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={modal.tabScroll} contentContainerStyle={modal.tabContent}>
             {CATEGORIES.map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                style={[modal.tab, activeCategory === cat && modal.tabActive]}
-                onPress={() => setActiveCategory(cat)}
-              >
+              <TouchableOpacity key={cat} style={[modal.tab, activeCategory === cat && modal.tabActive]} onPress={() => setActiveCategory(cat)}>
                 <Text style={[modal.tabText, activeCategory === cat && modal.tabTextActive]}>{cat}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
-
-          {/* Options */}
           <ScrollView contentContainerStyle={modal.grid}>
             {activeCategory === "Skin" && (
               <View style={modal.swatchRow}>
@@ -198,11 +249,7 @@ export default function ProfileScreen() {
             {activeCategory === "Hat" && (
               <View style={modal.chipGrid}>
                 {HAT_OPTIONS.map(h => (
-                  <TouchableOpacity
-                    key={h.id}
-                    style={[modal.hatChip, { backgroundColor: h.primary === "none" ? "#161b24" : h.primary }, draftConfig.hat === h.id && modal.hatChipSel]}
-                    onPress={() => updateDraft("hat", h.id)}
-                  >
+                  <TouchableOpacity key={h.id} style={[modal.hatChip, { backgroundColor: h.primary === "none" ? "#161b24" : h.primary }, draftConfig.hat === h.id && modal.hatChipSel]} onPress={() => updateDraft("hat", h.id)}>
                     <Text style={[modal.hatChipText, { color: h.text === "none" ? "#8a95a8" : h.text }]} numberOfLines={1}>{h.label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -233,12 +280,23 @@ export default function ProfileScreen() {
   );
 }
 
-function StatBox({ label, value, sublabel, color }: { label: string; value: number | string; sublabel?: string; color: string }) {
+function StatBox({ label, value, color }: { label: string; value: number | string; color: string }) {
   return (
     <View style={styles.statBox}>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
-      {sublabel ? <Text style={styles.statSublabel}>{sublabel}</Text> : null}
       <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function ExperienceBox({ count }: { count: number }) {
+  return (
+    <View style={styles.statBox}>
+      <View style={styles.expRow}>
+        <Text style={[styles.statValue, { color: "#a78bfa" }]}>{count}</Text>
+        <Text style={styles.expWord}>leagues</Text>
+      </View>
+      <Text style={styles.statLabel}>Experience</Text>
     </View>
   );
 }
@@ -262,15 +320,18 @@ const styles = StyleSheet.create({
   identityBlock: { alignItems: "center", marginBottom: 24 },
   avatarRing: { width: 120, height: 120, borderRadius: 60, overflow: "hidden", borderWidth: 3, borderColor: "#4f7cff", marginBottom: 6 },
   changeHint: { fontSize: 11, color: "#4f7cff", textAlign: "center", marginBottom: 10 },
-  username: { fontSize: 22, fontWeight: "800", color: "#e8eaf0", marginBottom: 4 },
+  username: { fontSize: 22, fontWeight: "800", color: "#e8eaf0", marginBottom: 8 },
+  rankBadge: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 8 },
+  rankText: { fontSize: 13, fontWeight: "700" },
   email: { fontSize: 13, color: "#8a95a8" },
   card: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 12, padding: 16, marginBottom: 16 },
   cardTitle: { fontSize: 12, fontWeight: "600", color: "#8a95a8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 },
   statsGrid: { flexDirection: "row", justifyContent: "space-around" },
   statBox: { alignItems: "center" },
   statValue: { fontSize: 26, fontWeight: "800" },
-  statSublabel: { fontSize: 10, color: "#8a95a8" },
   statLabel: { fontSize: 11, color: "#8a95a8", marginTop: 2 },
+  expRow: { flexDirection: "row", alignItems: "baseline", gap: 3 },
+  expWord: { fontSize: 14, fontWeight: "700", color: "#a78bfa" },
   divider: { height: 1, backgroundColor: "#1a2133", marginVertical: 14 },
   subLabel: { fontSize: 12, color: "#8a95a8", marginBottom: 10 },
   playoffRow: { alignItems: "center" },
