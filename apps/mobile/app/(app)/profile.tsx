@@ -57,6 +57,34 @@ function ChromaticText({ text, style }: { text: string; style?: object }) {
   );
 }
 
+function hx(hex: string): [number, number, number] {
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+}
+
+function MetallicText({ text, color, darkHex, style, waves = 1 }: {
+  text: string; color: string; darkHex?: string; style?: object; waves?: number;
+}) {
+  const [r, g, b] = hx(color);
+  const [dr, dg, db] = darkHex ? hx(darkHex) : [Math.round(r * 0.3), Math.round(g * 0.3), Math.round(b * 0.3)];
+  const br = Math.min(255, r + Math.round((255 - r) * 0.72));
+  const bg = Math.min(255, g + Math.round((255 - g) * 0.72));
+  const bb = Math.min(255, b + Math.round((255 - b) * 0.72));
+  const chars = text.split("");
+  const len = Math.max(chars.length - 1, 1);
+  return (
+    <Text style={style}>
+      {chars.map((ch, i) => {
+        const shine = Math.max(0.05, Math.sin((i / len) * Math.PI * waves));
+        return (
+          <Text key={i} style={{ color: `rgb(${lerpN(dr, br, shine)},${lerpN(dg, bg, shine)},${lerpN(db, bb, shine)})` }}>
+            {ch}
+          </Text>
+        );
+      })}
+    </Text>
+  );
+}
+
 const RANK_TIERS = [
   { name: "Rookie",           color: "#7c4a1e", req: "0–9 leagues played",                                                desc: "Every champion starts somewhere. Play in 10+ leagues to begin your Rivyl journey." },
   { name: "Rising Star",      color: "#3b82f6", req: "10+ leagues played",                                                desc: "Building momentum. Reach 20+ leagues with a 50%+ win rate to become a Contender." },
@@ -76,14 +104,38 @@ function computeRank(stats: Stats): RankInfo {
   const runnerUps = stats.runnerUps;
   const combined = champs + runnerUps;
 
-  if (w >= 300 && champs >= 10) return { name: "GOAT Status", color: "#4f7cff", description: "The pinnacle of Rivyl. 300+ wins and 10 championships. There is no higher rank — you are the greatest of all time." };
-  if (wp >= 65 && w >= 200 && combined >= 5 && champs >= 2) return { name: "Hall of Famer", color: "#FFD700", description: "An all-time great. Requires 200+ wins, 65%+ win rate, and 5 top-3 finishes with at least 2 championships. Next: GOAT Status (300 wins, 10 championships)." };
-  if (w >= 100 && champs >= 2) return { name: "Franchise Legend", color: "#15803d", description: "A dynasty builder. Requires 100+ all-time wins and 2 championships. Next: Hall of Famer (200+ wins, 65%+ win rate, 5 top-3 finishes including 2 championships)." };
-  if (leagues >= 60 && champs >= 1 && wp >= 60) return { name: "All-Pro", color: "#f97316", description: "Elite of the elite. Requires 60+ leagues, 1 championship, and 60%+ win rate. Next: Franchise Legend (100+ wins, 2 championships)." };
-  if (leagues >= 50 && wp >= 50 && runnerUps >= 1) return { name: "Pro-Bowler", color: "#8b5cf6", description: "A serious competitor. Requires 50+ leagues, 50%+ win rate, and a runner-up finish. Next: All-Pro (60+ leagues, 1 championship, 60%+ win rate)." };
-  if (leagues >= 20 && wp >= 50) return { name: "Contender", color: "#ef4444", description: "A consistent winner. Requires 20+ leagues and 50%+ win rate. Drop below 50% and you fall back to Rising Star. Next: Pro-Bowler (50+ leagues, runner-up finish)." };
-  if (leagues >= 10) return { name: "Rising Star", color: "#3b82f6", description: "Building momentum. You have 10+ leagues under your belt. Next: Contender (20+ leagues and 50%+ win rate). Drop below 50% and you stay here." };
-  return { name: "Rookie", color: "#7c4a1e", description: "Every champion starts somewhere. Play in 10+ leagues to earn Rising Star status and begin your Rivyl journey." };
+  if (w >= 300 && champs >= 10) return {
+    name: "GOAT Status", color: "#4f7cff",
+    description: "The pinnacle of Rivyl. 300+ wins and 10 championships. There is no higher rank — you are the greatest of all time.",
+  };
+  if (wp >= 65 && w >= 200 && combined >= 5 && champs >= 2) return {
+    name: "Hall of Famer", color: "#FFD700",
+    description: "An all-time great. Requires 200+ wins, 65%+ win rate, and 5 top-3 finishes with at least 2 championships. Next: GOAT Status (300 wins, 10 championships).",
+  };
+  if (w >= 100 && champs >= 2) return {
+    name: "Franchise Legend", color: "#15803d",
+    description: "A dynasty builder. Requires 100+ all-time wins and 2 championships. Next: Hall of Famer (200+ wins, 65%+ win rate, 5 top-3 finishes including 2 championships).",
+  };
+  if (leagues >= 60 && champs >= 1 && wp >= 60) return {
+    name: "All-Pro", color: "#f97316",
+    description: "Elite of the elite. Requires 60+ leagues, 1 championship, and 60%+ win rate. Next: Franchise Legend (100+ wins, 2 championships).",
+  };
+  if (leagues >= 50 && wp >= 50 && runnerUps >= 1) return {
+    name: "Pro-Bowler", color: "#8b5cf6",
+    description: "A serious competitor. Requires 50+ leagues, 50%+ win rate, and a runner-up finish. Next: All-Pro (60+ leagues, 1 championship, 60%+ win rate).",
+  };
+  if (leagues >= 20 && wp >= 50) return {
+    name: "Contender", color: "#ef4444",
+    description: "A consistent winner. Requires 20+ leagues and 50%+ win rate. Drop below 50% and you fall back to Rising Star. Next: Pro-Bowler (50+ leagues, runner-up finish).",
+  };
+  if (leagues >= 10) return {
+    name: "Rising Star", color: "#3b82f6",
+    description: "Building momentum. You have 10+ leagues under your belt. Next: Contender (20+ leagues and 50%+ win rate). Drop below 50% and you stay here.",
+  };
+  return {
+    name: "Rookie", color: "#7c4a1e",
+    description: "Every champion starts somewhere. Play in 10+ leagues to earn Rising Star status and begin your Rivyl journey.",
+  };
 }
 
 export default function ProfileScreen() {
@@ -107,10 +159,27 @@ export default function ProfileScreen() {
     });
   }, []);
 
-  function openPicker() { setDraftConfig({ ...config }); setShowPicker(true); }
-  async function savePicker() { setConfig(draftConfig); await AsyncStorage.setItem(AVATAR_KEY, JSON.stringify(draftConfig)); setShowPicker(false); }
-  function updateDraft(key: keyof AvatarConfig, value: string) { setDraftConfig(prev => ({ ...prev, [key]: value })); }
-  function handleLogout() { Alert.alert("Sign Out", "Are you sure you want to sign out?", [{ text: "Cancel", style: "cancel" }, { text: "Sign Out", style: "destructive", onPress: logout }]); }
+  function openPicker() {
+    setDraftConfig({ ...config });
+    setShowPicker(true);
+  }
+
+  async function savePicker() {
+    setConfig(draftConfig);
+    await AsyncStorage.setItem(AVATAR_KEY, JSON.stringify(draftConfig));
+    setShowPicker(false);
+  }
+
+  function updateDraft(key: keyof AvatarConfig, value: string) {
+    setDraftConfig(prev => ({ ...prev, [key]: value }));
+  }
+
+  function handleLogout() {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign Out", style: "destructive", onPress: logout },
+    ]);
+  }
 
   const rank = stats ? computeRank(stats) : null;
   const isGoat = rank?.name === "GOAT Status";
@@ -118,7 +187,9 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}><Text style={styles.back}>Back</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.back}>Back</Text>
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
         <View style={{ width: 50 }} />
       </View>
@@ -126,7 +197,9 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.identityBlock}>
           <TouchableOpacity onPress={openPicker} activeOpacity={0.8}>
-            <View style={styles.avatarRing}><AvatarCharacter config={config} size={110} /></View>
+            <View style={styles.avatarRing}>
+              <AvatarCharacter config={config} size={110} />
+            </View>
             <Text style={styles.changeHint}>Tap to customize</Text>
           </TouchableOpacity>
           <Text style={styles.username}>@{user?.username}</Text>
@@ -199,7 +272,9 @@ export default function ProfileScreen() {
           <View style={ranksModal.topBar}>
             <View style={{ width: 50 }} />
             <Text style={ranksModal.title}>All Ranks</Text>
-            <TouchableOpacity onPress={() => setShowAllRanks(false)}><Text style={ranksModal.done}>Done</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowAllRanks(false)}>
+              <Text style={ranksModal.done}>Done</Text>
+            </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={ranksModal.content}>
             {RANK_TIERS.map((tier) => {
@@ -210,7 +285,14 @@ export default function ProfileScreen() {
               const useMetallic = !isGoatTier && !isRookie;
               const hofDark = "#7A5C00";
               return (
-                <View key={tier.name} style={[ranksModal.tierRow, isCurrent && !isGoatTier && { backgroundColor: tier.color + "12", borderColor: tier.color + "44" }, isCurrent && isGoatTier && { borderColor: "#7c3aed55", backgroundColor: "#1a0d2e" }]}>
+                <View
+                  key={tier.name}
+                  style={[
+                    ranksModal.tierRow,
+                    isCurrent && !isGoatTier && { backgroundColor: tier.color + "12", borderColor: tier.color + "44" },
+                    isCurrent && isGoatTier && { borderColor: "#7c3aed55", backgroundColor: "#1a0d2e" },
+                  ]}
+                >
                   {isGoatTier ? (
                     <LinearGradient colors={["#ef4444", "#4f7cff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ranksModal.dot} />
                   ) : (
@@ -257,11 +339,19 @@ export default function ProfileScreen() {
         <View style={modal.container}>
           <View style={modal.handle} />
           <View style={modal.topBar}>
-            <TouchableOpacity onPress={() => setShowPicker(false)}><Text style={modal.cancel}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowPicker(false)}>
+              <Text style={modal.cancel}>Cancel</Text>
+            </TouchableOpacity>
             <Text style={modal.title}>Customize Avatar</Text>
-            <TouchableOpacity onPress={savePicker}><Text style={modal.save}>Save</Text></TouchableOpacity>
+            <TouchableOpacity onPress={savePicker}>
+              <Text style={modal.save}>Save</Text>
+            </TouchableOpacity>
           </View>
-          <View style={modal.preview}><View style={modal.previewRing}><AvatarCharacter config={draftConfig} size={140} /></View></View>
+          <View style={modal.preview}>
+            <View style={modal.previewRing}>
+              <AvatarCharacter config={draftConfig} size={140} />
+            </View>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={modal.tabScroll} contentContainerStyle={modal.tabContent}>
             {CATEGORIES.map((cat) => (
               <TouchableOpacity key={cat} style={[modal.tab, activeCategory === cat && modal.tabActive]} onPress={() => setActiveCategory(cat)}>
@@ -270,12 +360,60 @@ export default function ProfileScreen() {
             ))}
           </ScrollView>
           <ScrollView contentContainerStyle={modal.grid}>
-            {activeCategory === "Skin" && <View style={modal.swatchRow}>{SKIN_TONES.map(s => (<TouchableOpacity key={s.id} style={[modal.swatch, { backgroundColor: s.color }, draftConfig.skinTone === s.id && modal.swatchSel]} onPress={() => updateDraft("skinTone", s.id)}>{draftConfig.skinTone === s.id && <Text style={modal.swatchCheck}>✓</Text>}</TouchableOpacity>))}</View>}
-            {activeCategory === "Hair Style" && <View style={modal.chipGrid}>{HAIR_STYLES.map(h => (<TouchableOpacity key={h.id} style={[modal.optChip, draftConfig.hairStyle === h.id && modal.optChipSel]} onPress={() => updateDraft("hairStyle", h.id)}><Text style={[modal.optChipText, draftConfig.hairStyle === h.id && modal.optChipTextSel]}>{h.label}</Text></TouchableOpacity>))}</View>}
-            {activeCategory === "Hair Color" && <View style={modal.swatchRow}>{HAIR_COLORS.map(h => (<TouchableOpacity key={h.id} style={[modal.swatch, { backgroundColor: h.color }, draftConfig.hairColor === h.id && modal.swatchSel]} onPress={() => updateDraft("hairColor", h.id)}>{draftConfig.hairColor === h.id && <Text style={[modal.swatchCheck, { color: h.color === "#DCDCDC" ? "#333" : "#fff" }]}>✓</Text>}</TouchableOpacity>))}</View>}
-            {activeCategory === "Hat" && <View style={modal.chipGrid}>{HAT_OPTIONS.map(h => (<TouchableOpacity key={h.id} style={[modal.hatChip, { backgroundColor: h.primary === "none" ? "#161b24" : h.primary }, draftConfig.hat === h.id && modal.hatChipSel]} onPress={() => updateDraft("hat", h.id)}><Text style={[modal.hatChipText, { color: h.text === "none" ? "#8a95a8" : h.text }]} numberOfLines={1}>{h.label}</Text></TouchableOpacity>))}</View>}
-            {activeCategory === "Jersey" && <View style={modal.swatchRow}>{JERSEY_COLORS.map(j => (<TouchableOpacity key={j.id} style={[modal.swatch, { backgroundColor: j.color }, draftConfig.jersey === j.id && modal.swatchSel]} onPress={() => updateDraft("jersey", j.id)}>{draftConfig.jersey === j.id && <Text style={modal.swatchCheck}>✓</Text>}</TouchableOpacity>))}</View>}
-            {activeCategory === "Expression" && <View style={modal.chipGrid}>{EXPRESSIONS.map(e => (<TouchableOpacity key={e.id} style={[modal.optChip, draftConfig.expression === e.id && modal.optChipSel]} onPress={() => updateDraft("expression", e.id)}><Text style={[modal.optChipText, draftConfig.expression === e.id && modal.optChipTextSel]}>{e.label}</Text></TouchableOpacity>))}</View>}
+            {activeCategory === "Skin" && (
+              <View style={modal.swatchRow}>
+                {SKIN_TONES.map(s => (
+                  <TouchableOpacity key={s.id} style={[modal.swatch, { backgroundColor: s.color }, draftConfig.skinTone === s.id && modal.swatchSel]} onPress={() => updateDraft("skinTone", s.id)}>
+                    {draftConfig.skinTone === s.id && <Text style={modal.swatchCheck}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {activeCategory === "Hair Style" && (
+              <View style={modal.chipGrid}>
+                {HAIR_STYLES.map(h => (
+                  <TouchableOpacity key={h.id} style={[modal.optChip, draftConfig.hairStyle === h.id && modal.optChipSel]} onPress={() => updateDraft("hairStyle", h.id)}>
+                    <Text style={[modal.optChipText, draftConfig.hairStyle === h.id && modal.optChipTextSel]}>{h.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {activeCategory === "Hair Color" && (
+              <View style={modal.swatchRow}>
+                {HAIR_COLORS.map(h => (
+                  <TouchableOpacity key={h.id} style={[modal.swatch, { backgroundColor: h.color }, draftConfig.hairColor === h.id && modal.swatchSel]} onPress={() => updateDraft("hairColor", h.id)}>
+                    {draftConfig.hairColor === h.id && <Text style={[modal.swatchCheck, { color: h.color === "#DCDCDC" ? "#333" : "#fff" }]}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {activeCategory === "Hat" && (
+              <View style={modal.chipGrid}>
+                {HAT_OPTIONS.map(h => (
+                  <TouchableOpacity key={h.id} style={[modal.hatChip, { backgroundColor: h.primary === "none" ? "#161b24" : h.primary }, draftConfig.hat === h.id && modal.hatChipSel]} onPress={() => updateDraft("hat", h.id)}>
+                    <Text style={[modal.hatChipText, { color: h.text === "none" ? "#8a95a8" : h.text }]} numberOfLines={1}>{h.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {activeCategory === "Jersey" && (
+              <View style={modal.swatchRow}>
+                {JERSEY_COLORS.map(j => (
+                  <TouchableOpacity key={j.id} style={[modal.swatch, { backgroundColor: j.color }, draftConfig.jersey === j.id && modal.swatchSel]} onPress={() => updateDraft("jersey", j.id)}>
+                    {draftConfig.jersey === j.id && <Text style={modal.swatchCheck}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {activeCategory === "Expression" && (
+              <View style={modal.chipGrid}>
+                {EXPRESSIONS.map(e => (
+                  <TouchableOpacity key={e.id} style={[modal.optChip, draftConfig.expression === e.id && modal.optChipSel]} onPress={() => updateDraft("expression", e.id)}>
+                    <Text style={[modal.optChipText, draftConfig.expression === e.id && modal.optChipTextSel]}>{e.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </ScrollView>
         </View>
       </Modal>
@@ -284,15 +422,34 @@ export default function ProfileScreen() {
 }
 
 function StatBox({ label, value, color }: { label: string; value: number | string; color: string }) {
-  return <View style={styles.statBox}><Text style={[styles.statValue, { color }]}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
+  return (
+    <View style={styles.statBox}>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
 }
 
 function ExperienceBox({ count }: { count: number }) {
-  return <View style={styles.statBox}><View style={styles.expRow}><Text style={[styles.statValue, { color: "#a78bfa" }]}>{count}</Text><Text style={styles.expWord}>leagues</Text></View><Text style={styles.statLabel}>Experience</Text></View>;
+  return (
+    <View style={styles.statBox}>
+      <View style={styles.expRow}>
+        <Text style={[styles.statValue, { color: "#a78bfa" }]}>{count}</Text>
+        <Text style={styles.expWord}>leagues</Text>
+      </View>
+      <Text style={styles.statLabel}>Experience</Text>
+    </View>
+  );
 }
 
 function TrophyBadge({ emoji, label, count, color }: { emoji: string; label: string; count: number; color: string }) {
-  return <View style={styles.trophyBadge}><Text style={styles.trophyEmoji}>{emoji}</Text><Text style={[styles.trophyCount, { color }]}>{count}</Text><Text style={styles.trophyLabel}>{label}</Text></View>;
+  return (
+    <View style={styles.trophyBadge}>
+      <Text style={styles.trophyEmoji}>{emoji}</Text>
+      <Text style={[styles.trophyCount, { color }]}>{count}</Text>
+      <Text style={styles.trophyLabel}>{label}</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
