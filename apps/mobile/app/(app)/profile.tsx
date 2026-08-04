@@ -58,14 +58,14 @@ function ChromaticText({ text, style }: { text: string; style?: object }) {
 }
 
 const RANK_TIERS = [
-  { name: "Rookie",           color: "#7c4a1e", req: "0\u20139 leagues played",                                                desc: "Every champion starts somewhere. Play in 10+ leagues to begin your Rivyl journey." },
+  { name: "Rookie",           color: "#7c4a1e", req: "0–9 leagues played",                                                desc: "Every champion starts somewhere. Play in 10+ leagues to begin your Rivyl journey." },
   { name: "Rising Star",      color: "#3b82f6", req: "10+ leagues played",                                                desc: "Building momentum. Reach 20+ leagues with a 50%+ win rate to become a Contender." },
-  { name: "Contender",        color: "#ef4444", req: "20+ leagues \u00b7 50%+ win rate",                                       desc: "A consistent winner. Drop below 50% win rate and you fall back to Rising Star." },
-  { name: "Pro-Bowler",       color: "#8b5cf6", req: "50+ leagues \u00b7 50%+ win rate \u00b7 1+ runner-up",                       desc: "A serious competitor. You've been to the finals and kept a winning record doing it." },
-  { name: "All-Pro",          color: "#f97316", req: "60+ leagues \u00b7 1+ championship \u00b7 60%+ win rate",                    desc: "Elite of the elite. You've won a championship and maintained an elite win rate." },
-  { name: "Franchise Legend", color: "#15803d", req: "100+ wins \u00b7 2+ championships",                                     desc: "A dynasty builder. Multiple championships and over 100 all-time wins." },
-  { name: "Hall of Famer",    color: "#FFD700", req: "200+ wins \u00b7 65%+ win rate \u00b7 5+ top-3 finishes \u00b7 2+ championships", desc: "An all-time great. Sustained excellence over a long career." },
-  { name: "GOAT Status",      color: "#4f7cff", req: "300+ wins \u00b7 10 championships",                                     desc: "The pinnacle of Rivyl. There is no higher rank \u2014 you are the greatest of all time." },
+  { name: "Contender",        color: "#ef4444", req: "20+ leagues · 50%+ win rate",                                       desc: "A consistent winner. Drop below 50% win rate and you fall back to Rising Star." },
+  { name: "Pro-Bowler",       color: "#8b5cf6", req: "50+ leagues · 50%+ win rate · 1+ runner-up",                       desc: "A serious competitor. You've been to the finals and kept a winning record doing it." },
+  { name: "All-Pro",          color: "#f97316", req: "60+ leagues · 1+ championship · 60%+ win rate",                    desc: "Elite of the elite. You've won a championship and maintained an elite win rate." },
+  { name: "Franchise Legend", color: "#15803d", req: "100+ wins · 2+ championships",                                     desc: "A dynasty builder. Multiple championships and over 100 all-time wins." },
+  { name: "Hall of Famer",    color: "#FFD700", req: "200+ wins · 65%+ win rate · 5+ top-3 finishes · 2+ championships", desc: "An all-time great. Sustained excellence over a long career." },
+  { name: "GOAT Status",      color: "#4f7cff", req: "300+ wins · 10 championships",                                     desc: "The pinnacle of Rivyl. There is no higher rank — you are the greatest of all time." },
 ];
 
 function computeRank(stats: Stats): RankInfo {
@@ -76,7 +76,7 @@ function computeRank(stats: Stats): RankInfo {
   const runnerUps = stats.runnerUps;
   const combined = champs + runnerUps;
 
-  if (w >= 300 && champs >= 10) return { name: "GOAT Status", color: "#4f7cff", description: "The pinnacle of Rivyl. 300+ wins and 10 championships. There is no higher rank \u2014 you are the greatest of all time." };
+  if (w >= 300 && champs >= 10) return { name: "GOAT Status", color: "#4f7cff", description: "The pinnacle of Rivyl. 300+ wins and 10 championships. There is no higher rank — you are the greatest of all time." };
   if (wp >= 65 && w >= 200 && combined >= 5 && champs >= 2) return { name: "Hall of Famer", color: "#FFD700", description: "An all-time great. Requires 200+ wins, 65%+ win rate, and 5 top-3 finishes with at least 2 championships. Next: GOAT Status (300 wins, 10 championships)." };
   if (w >= 100 && champs >= 2) return { name: "Franchise Legend", color: "#15803d", description: "A dynasty builder. Requires 100+ all-time wins and 2 championships. Next: Hall of Famer (200+ wins, 65%+ win rate, 5 top-3 finishes including 2 championships)." };
   if (leagues >= 60 && champs >= 1 && wp >= 60) return { name: "All-Pro", color: "#f97316", description: "Elite of the elite. Requires 60+ leagues, 1 championship, and 60%+ win rate. Next: Franchise Legend (100+ wins, 2 championships)." };
@@ -132,22 +132,21 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           <Text style={styles.username}>@{user?.username}</Text>
           {rank && (
-            <View style={styles.rankRow}>
-              {isGoat ? (
-                <TouchableOpacity onPress={() => showRankInfo(rank)} style={{ borderRadius: 999, overflow: "hidden" }} activeOpacity={0.7}>
-                  <LinearGradient colors={["#ef4444", "#7c3aed", "#4f7cff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.rankBadgeGrad}>
-                    <Text style={styles.rankTextWhite}>{rank.name}</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity onPress={() => showRankInfo(rank)} style={[styles.rankBadge, { backgroundColor: rank.color + "22", borderColor: rank.color + "55" }]} activeOpacity={0.7}>
-                  <Text style={[styles.rankText, { color: rank.color }]}>{rank.name}</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={() => setShowAllRanks(true)} style={styles.rankInfoBtn} activeOpacity={0.7}>
-                <Text style={styles.rankInfoText}>\u24d8</Text>
+            isGoat ? (
+              <TouchableOpacity onPress={() => setShowAllRanks(true)} style={{ borderRadius: 999, overflow: "hidden", marginBottom: 8 }} activeOpacity={0.7}>
+                <LinearGradient colors={["#ef4444", "#7c3aed", "#4f7cff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.rankBadgeGrad}>
+                  <Text style={styles.rankTextWhite}>{rank.name}</Text>
+                </LinearGradient>
               </TouchableOpacity>
-            </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => setShowAllRanks(true)}
+                style={[styles.rankBadge, { backgroundColor: rank.color + "22", borderColor: rank.color + "55", marginBottom: 8 }]}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.rankText, { color: rank.color }]}>{rank.name}</Text>
+              </TouchableOpacity>
+            )
           )}
           <Text style={styles.email}>{user?.email}</Text>
         </View>
@@ -169,16 +168,16 @@ export default function ProfileScreen() {
               <View style={styles.playoffRow}>
                 <Text style={styles.playoffStat}>
                   <Text style={{ color: "#22c55e" }}>{stats.playoffWins}W</Text>
-                  <Text style={{ color: "#4a5568" }}> \u2013 </Text>
+                  <Text style={{ color: "#4a5568" }}> – </Text>
                   <Text style={{ color: "#ef4444" }}>{stats.playoffLosses}L</Text>
                 </Text>
               </View>
               <View style={styles.divider} />
               <Text style={styles.subLabel}>Hardware</Text>
               <View style={styles.trophyRow}>
-                <TrophyBadge emoji="\ud83c\udfc6" label="Champ" count={stats.championships} color="#f59e0b" />
-                <TrophyBadge emoji="\ud83e\udd48" label="Runner-Up" count={stats.runnerUps} color="#9ca3af" />
-                <TrophyBadge emoji="\ud83e\udd49" label="3rd Place" count={0} color="#cd7c32" />
+                <TrophyBadge emoji="🏆" label="Champ" count={stats.championships} color="#f59e0b" />
+                <TrophyBadge emoji="🥈" label="Runner-Up" count={stats.runnerUps} color="#9ca3af" />
+                <TrophyBadge emoji="🥉" label="3rd Place" count={0} color="#cd7c32" />
               </View>
               <View style={{ height: 16 }} />
               <TouchableOpacity style={styles.trophyRoomBtn} onPress={() => router.push("/(app)/trophy-room")} activeOpacity={0.8}>
@@ -186,7 +185,7 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </>
           ) : (
-            <Text style={styles.noData}>No stats yet \u2014 join a league!</Text>
+            <Text style={styles.noData}>No stats yet — join a league!</Text>
           )}
         </View>
 
@@ -264,11 +263,11 @@ export default function ProfileScreen() {
             ))}
           </ScrollView>
           <ScrollView contentContainerStyle={modal.grid}>
-            {activeCategory === "Skin" && <View style={modal.swatchRow}>{SKIN_TONES.map(s => (<TouchableOpacity key={s.id} style={[modal.swatch, { backgroundColor: s.color }, draftConfig.skinTone === s.id && modal.swatchSel]} onPress={() => updateDraft("skinTone", s.id)}>{draftConfig.skinTone === s.id && <Text style={modal.swatchCheck}>\u2713</Text>}</TouchableOpacity>))}</View>}
+            {activeCategory === "Skin" && <View style={modal.swatchRow}>{SKIN_TONES.map(s => (<TouchableOpacity key={s.id} style={[modal.swatch, { backgroundColor: s.color }, draftConfig.skinTone === s.id && modal.swatchSel]} onPress={() => updateDraft("skinTone", s.id)}>{draftConfig.skinTone === s.id && <Text style={modal.swatchCheck}>✓</Text>}</TouchableOpacity>))}</View>}
             {activeCategory === "Hair Style" && <View style={modal.chipGrid}>{HAIR_STYLES.map(h => (<TouchableOpacity key={h.id} style={[modal.optChip, draftConfig.hairStyle === h.id && modal.optChipSel]} onPress={() => updateDraft("hairStyle", h.id)}><Text style={[modal.optChipText, draftConfig.hairStyle === h.id && modal.optChipTextSel]}>{h.label}</Text></TouchableOpacity>))}</View>}
-            {activeCategory === "Hair Color" && <View style={modal.swatchRow}>{HAIR_COLORS.map(h => (<TouchableOpacity key={h.id} style={[modal.swatch, { backgroundColor: h.color }, draftConfig.hairColor === h.id && modal.swatchSel]} onPress={() => updateDraft("hairColor", h.id)}>{draftConfig.hairColor === h.id && <Text style={[modal.swatchCheck, { color: h.color === "#DCDCDC" ? "#333" : "#fff" }]}>\u2713</Text>}</TouchableOpacity>))}</View>}
+            {activeCategory === "Hair Color" && <View style={modal.swatchRow}>{HAIR_COLORS.map(h => (<TouchableOpacity key={h.id} style={[modal.swatch, { backgroundColor: h.color }, draftConfig.hairColor === h.id && modal.swatchSel]} onPress={() => updateDraft("hairColor", h.id)}>{draftConfig.hairColor === h.id && <Text style={[modal.swatchCheck, { color: h.color === "#DCDCDC" ? "#333" : "#fff" }]}>✓</Text>}</TouchableOpacity>))}</View>}
             {activeCategory === "Hat" && <View style={modal.chipGrid}>{HAT_OPTIONS.map(h => (<TouchableOpacity key={h.id} style={[modal.hatChip, { backgroundColor: h.primary === "none" ? "#161b24" : h.primary }, draftConfig.hat === h.id && modal.hatChipSel]} onPress={() => updateDraft("hat", h.id)}><Text style={[modal.hatChipText, { color: h.text === "none" ? "#8a95a8" : h.text }]} numberOfLines={1}>{h.label}</Text></TouchableOpacity>))}</View>}
-            {activeCategory === "Jersey" && <View style={modal.swatchRow}>{JERSEY_COLORS.map(j => (<TouchableOpacity key={j.id} style={[modal.swatch, { backgroundColor: j.color }, draftConfig.jersey === j.id && modal.swatchSel]} onPress={() => updateDraft("jersey", j.id)}>{draftConfig.jersey === j.id && <Text style={modal.swatchCheck}>\u2713</Text>}</TouchableOpacity>))}</View>}
+            {activeCategory === "Jersey" && <View style={modal.swatchRow}>{JERSEY_COLORS.map(j => (<TouchableOpacity key={j.id} style={[modal.swatch, { backgroundColor: j.color }, draftConfig.jersey === j.id && modal.swatchSel]} onPress={() => updateDraft("jersey", j.id)}>{draftConfig.jersey === j.id && <Text style={modal.swatchCheck}>✓</Text>}</TouchableOpacity>))}</View>}
             {activeCategory === "Expression" && <View style={modal.chipGrid}>{EXPRESSIONS.map(e => (<TouchableOpacity key={e.id} style={[modal.optChip, draftConfig.expression === e.id && modal.optChipSel]} onPress={() => updateDraft("expression", e.id)}><Text style={[modal.optChipText, draftConfig.expression === e.id && modal.optChipTextSel]}>{e.label}</Text></TouchableOpacity>))}</View>}
           </ScrollView>
         </View>
@@ -299,13 +298,10 @@ const styles = StyleSheet.create({
   avatarRing: { width: 120, height: 120, borderRadius: 60, overflow: "hidden", borderWidth: 3, borderColor: "#4f7cff", marginBottom: 6 },
   changeHint: { fontSize: 11, color: "#4f7cff", textAlign: "center", marginBottom: 10 },
   username: { fontSize: 22, fontWeight: "800", color: "#e8eaf0", marginBottom: 8 },
-  rankRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   rankBadge: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 5 },
   rankBadgeGrad: { paddingHorizontal: 14, paddingVertical: 5 },
   rankText: { fontSize: 13, fontWeight: "700" },
   rankTextWhite: { fontSize: 13, fontWeight: "700", color: "#fff" },
-  rankInfoBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#1a2133", borderWidth: 1, borderColor: "#2a3347", alignItems: "center", justifyContent: "center" },
-  rankInfoText: { fontSize: 14, color: "#8a95a8" },
   email: { fontSize: 13, color: "#8a95a8" },
   card: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 12, padding: 16, marginBottom: 16 },
   cardTitle: { fontSize: 12, fontWeight: "600", color: "#8a95a8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 },
