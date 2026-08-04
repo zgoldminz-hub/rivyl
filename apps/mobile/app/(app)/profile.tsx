@@ -111,7 +111,6 @@ export default function ProfileScreen() {
   async function savePicker() { setConfig(draftConfig); await AsyncStorage.setItem(AVATAR_KEY, JSON.stringify(draftConfig)); setShowPicker(false); }
   function updateDraft(key: keyof AvatarConfig, value: string) { setDraftConfig(prev => ({ ...prev, [key]: value })); }
   function handleLogout() { Alert.alert("Sign Out", "Are you sure you want to sign out?", [{ text: "Cancel", style: "cancel" }, { text: "Sign Out", style: "destructive", onPress: logout }]); }
-  function showRankInfo(rank: RankInfo) { Alert.alert(rank.name, rank.description); }
 
   const rank = stats ? computeRank(stats) : null;
   const isGoat = rank?.name === "GOAT Status";
@@ -206,6 +205,10 @@ export default function ProfileScreen() {
             {RANK_TIERS.map((tier) => {
               const isCurrent = rank?.name === tier.name;
               const isGoatTier = tier.name === "GOAT Status";
+              const isRookie = tier.name === "Rookie";
+              const isHoF = tier.name === "Hall of Famer";
+              const useMetallic = !isGoatTier && !isRookie;
+              const hofDark = "#7A5C00";
               return (
                 <View key={tier.name} style={[ranksModal.tierRow, isCurrent && !isGoatTier && { backgroundColor: tier.color + "12", borderColor: tier.color + "44" }, isCurrent && isGoatTier && { borderColor: "#7c3aed55", backgroundColor: "#1a0d2e" }]}>
                   {isGoatTier ? (
@@ -217,6 +220,8 @@ export default function ProfileScreen() {
                     <View style={ranksModal.nameRow}>
                       {isGoatTier ? (
                         <ChromaticText text={tier.name} style={ranksModal.tierName} />
+                      ) : useMetallic ? (
+                        <MetallicText text={tier.name} color={tier.color} darkHex={isHoF ? hofDark : undefined} style={ranksModal.tierName} waves={1} />
                       ) : (
                         <Text style={[ranksModal.tierName, { color: tier.color }]}>{tier.name}</Text>
                       )}
@@ -235,6 +240,8 @@ export default function ProfileScreen() {
                     <Text style={ranksModal.req}>{tier.req}</Text>
                     {isGoatTier ? (
                       <ChromaticText text={tier.desc} style={ranksModal.desc} />
+                    ) : useMetallic ? (
+                      <MetallicText text={tier.desc} color={tier.color} darkHex={isHoF ? hofDark : undefined} style={ranksModal.desc} waves={1.5} />
                     ) : (
                       <Text style={[ranksModal.desc, { color: tier.color }]}>{tier.desc}</Text>
                     )}
