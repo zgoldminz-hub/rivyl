@@ -47,18 +47,30 @@ export default function DashboardScreen() {
   const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 60 });
 
   const entryLabel = (buyIn: number) =>
-    buyIn === 0 ? "Free" : "$" + (buyIn / 100).toLocaleString() + " entry";
+    buyIn === 0 ? "Free" : "$" + buyIn.toLocaleString() + " entry";
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.logo}>Rivyl</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.createBtn} onPress={() => router.push("/(app)/create-league" as any)}>
-            <Text style={styles.createBtnText}>+ Create</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.searchBtn} onPress={() => router.push("/(app)/discover" as any)}>
-            <Text style={styles.searchBtnText}>Search</Text>
+        <View style={styles.headerRight}>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.createBtn} onPress={() => router.push("/(app)/create-league" as any)}>
+              <Text style={styles.createBtnText}>+ Create</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.searchBtn} onPress={() => router.push("/(app)/discover" as any)}>
+              <Text style={styles.searchBtnText}>Search</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/(app)/rankings" as any)}>
+            <LinearGradient
+              colors={["#ef4444", "#7c3aed", "#4f7cff"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.rankingsHeaderBtn}
+            >
+              <Text style={styles.rankingsHeaderText}>Rivyl Rankings</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -118,12 +130,6 @@ export default function DashboardScreen() {
             )}
           </>
         )}
-
-        <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/(app)/rankings" as any)} style={styles.rankingsWrapper}>
-          <LinearGradient colors={["#ef4444", "#7c3aed", "#4f7cff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.rankingsBtn}>
-            <Text style={styles.rankingsText}>Rivyl Rankings</Text>
-          </LinearGradient>
-        </TouchableOpacity>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -137,13 +143,16 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0d0f14" },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#2a3347", backgroundColor: "#161b24" },
-  logo: { fontSize: 20, fontWeight: "700", color: "#4f7cff", letterSpacing: -0.5 },
+  header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#2a3347", backgroundColor: "#161b24" },
+  logo: { fontSize: 22, fontWeight: "700", color: "#4f7cff", letterSpacing: -0.5, paddingTop: 6 },
+  headerRight: { alignItems: "flex-end", gap: 6 },
   headerActions: { flexDirection: "row", gap: 8 },
   createBtn: { backgroundColor: "#4f7cff", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
   createBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   searchBtn: { backgroundColor: "#ef4444", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
   searchBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  rankingsHeaderBtn: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
+  rankingsHeaderText: { color: "#fff", fontSize: 13, fontWeight: "700", letterSpacing: 0.3 },
   scroll: { flex: 1 },
   scrollContent: { paddingTop: 20, paddingBottom: 40 },
   sectionHeading: { fontSize: 20, fontWeight: "700", color: "#e8eaf0", paddingHorizontal: 20, marginBottom: 14 },
@@ -163,9 +172,6 @@ const styles = StyleSheet.create({
   dots: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 12 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#2a3347" },
   dotActive: { backgroundColor: "#4f7cff", width: 18 },
-  rankingsWrapper: { marginHorizontal: 20, marginTop: 28 },
-  rankingsBtn: { borderRadius: 14, padding: 18, alignItems: "center" },
-  rankingsText: { color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: 0.5 },
   footer: { paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "#2a3347" },
   username: { fontSize: 14, color: "#8a95a8", fontWeight: "600" },
 });

@@ -10,10 +10,10 @@ import { api } from "../../src/api/client";
 const TEAM_OPTIONS = [4, 6, 8, 10, 12];
 const BUY_IN_OPTIONS = [
   { label: "Free", value: 0 },
-  { label: "$10", value: 1000 },
-  { label: "$25", value: 2500 },
-  { label: "$50", value: 5000 },
-  { label: "$100", value: 10000 },
+  { label: "$10", value: 10 },
+  { label: "$25", value: 25 },
+  { label: "$50", value: 50 },
+  { label: "$100", value: 100 },
 ];
 const SCORING_OPTIONS = [
   { label: "Half PPR", value: "HALF_PPR" },
@@ -52,7 +52,7 @@ export default function CreateLeagueScreen() {
   const [visibility, setVisibility] = useState("PRIVATE");
   const [loading, setLoading] = useState(false);
 
-  const potTotal = (buyIn / 100) * maxTeams;
+  const potTotal = buyIn * maxTeams;
   const prizePool = Math.floor(potTotal * 0.95);
 
   async function handleCreate() {
