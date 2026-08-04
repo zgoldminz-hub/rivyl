@@ -65,7 +65,7 @@ function MetallicText({ text, color, darkHex, style, waves = 1 }: {
   text: string; color: string; darkHex?: string; style?: object; waves?: number;
 }) {
   const [r, g, b] = hx(color);
-  const [dr, dg, db] = darkHex ? hx(darkHex) : [Math.round(r * 0.3), Math.round(g * 0.3), Math.round(b * 0.3)];
+  const [dr, dg, db] = darkHex ? hx(darkHex) : [Math.round(r * 0.65), Math.round(g * 0.65), Math.round(b * 0.65)];
   const br = Math.min(255, Math.round(r * 1.6));
   const bg = Math.min(255, Math.round(g * 1.6));
   const bb = Math.min(255, Math.round(b * 1.6));
