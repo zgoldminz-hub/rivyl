@@ -138,6 +138,16 @@ function computeRank(stats: Stats): RankInfo {
   };
 }
 
+function RankSortIcon({ color }: { color: string }) {
+  return (
+    <View style={{ alignItems: "center", gap: 2 }}>
+      <Text style={{ color, fontSize: 8, lineHeight: 9 }}>▲</Text>
+      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color }} />
+      <Text style={{ color, fontSize: 8, lineHeight: 9 }}>▼</Text>
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -206,21 +216,22 @@ export default function ProfileScreen() {
           {rank && (
             isGoat ? (
               <TouchableOpacity onPress={() => setShowAllRanks(true)} style={{ borderRadius: 999, overflow: "hidden", marginBottom: 8 }} activeOpacity={0.7}>
-                <LinearGradient colors={["#ef4444", "#7c3aed", "#4f7cff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.rankBadgeGrad}>
-                  <Text style={styles.rankTextWhite}>{rank.name}  ›</Text>
+                <LinearGradient colors={["#ef4444", "#7c3aed", "#4f7cff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.rankBadgeGrad, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
+                  <Text style={styles.rankTextWhite}>{rank.name}</Text>
+                  <RankSortIcon color="#fff" />
                 </LinearGradient>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
                 onPress={() => setShowAllRanks(true)}
-                style={[styles.rankBadge, { backgroundColor: rank.color + "22", borderColor: rank.color + "cc", marginBottom: 4 }]}
+                style={[styles.rankBadge, { backgroundColor: rank.color + "22", borderColor: rank.color + "cc", marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 }]}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.rankText, { color: rank.color }]}>{rank.name}  ›</Text>
+                <Text style={[styles.rankText, { color: rank.color }]}>{rank.name}</Text>
+                <RankSortIcon color={rank.color} />
               </TouchableOpacity>
             )
           )}
-          {rank && <Text style={styles.rankHint}>view all ranks</Text>}
           <Text style={styles.email}>{user?.email}</Text>
         </View>
 
@@ -468,7 +479,6 @@ const styles = StyleSheet.create({
   rankText: { fontSize: 13, fontWeight: "700" },
   rankTextWhite: { fontSize: 13, fontWeight: "700", color: "#fff" },
   email: { fontSize: 13, color: "#8a95a8" },
-  rankHint: { fontSize: 11, color: "#4a5568", marginBottom: 6, letterSpacing: 0.5 },
   card: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 12, padding: 16, marginBottom: 16 },
   cardTitle: { fontSize: 12, fontWeight: "600", color: "#8a95a8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 },
   statsGrid: { flexDirection: "row", justifyContent: "space-around" },
