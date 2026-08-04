@@ -122,4 +122,53 @@ router.delete("/payment-method/:pmId", requireAuth, async (req: AuthRequest, res
   res.json({ ok: true, data: null });
 });
 
+
+router.get("/stats", requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  const teams = await prisma.team.findMany({
+    where: { userId: req.userId },
+    include: {
+      league: { select: { status: true } },
+      homeMatchups: true,
+      awayMatchups: true,
+    },
+  });
+
+  let regWins = 0, regLosses = 0, playoffWins = 0, playoffLosses = 0;
+  let championships = 0, runnerUps = 0;
+
+  for (const team of teams) {
+    const mine = [
+      ...team.homeMatchups.map(m => ({ ...m, myScore: m.homeScore, oppScore: m.awayScore })),
+      ...team.awayMatchups.map(m => ({ ...m, myScore: m.awayScore, oppScore: m.homeScore })),
+    ];
+    for (const m of mine) {
+      const won = m.myScore > m.oppScore;
+      if (!m.isPlayoff) { won ? regWins++ : regLosses++; }
+      else { won ? playoffWins++ : playoffLosses++; }
+    }
+    if (team.league.status === "COMPLETE") {
+      const playoffs = mine.filter(m => m.isPlayoff);
+      if (!playoffs.length) continue;
+      const maxWeek = Math.max(...playoffs.map(m => m.week));
+      const final = playoffs.find(m => m.week === maxWeek);
+      if (final) {
+        if (final.myScore > final.oppScore) championships++;
+        else runnerUps++;
+      }
+    }
+  }
+
+  res.json({
+    ok: true,
+    data: {
+      stats: {
+        regWins, regLosses, playoffWins, playoffLosses,
+        championships, runnerUps,
+        winPct: regWins + regLosses > 0 ? Math.round((regWins / (regWins + regLosses)) * 100) : 0,
+        totalLeagues: teams.length,
+      },
+    },
+  });
+});
+
 export default router;

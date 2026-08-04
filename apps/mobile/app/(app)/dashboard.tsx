@@ -1,17 +1,25 @@
-import { useEffect, useState, useRef } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, NativeSyntheticEvent, NativeScrollEvent } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  ActivityIndicator, Dimensions, FlatList,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../src/store/auth";
 import { api } from "../../src/api/client";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_WIDTH = SCREEN_WIDTH - 40;
+const { width: SCREEN_W } = Dimensions.get("window");
+const CARD_W = SCREEN_W - 40;
 
 interface League {
-  id: string; name: string; status: string; buyIn: number;
-  maxTeams: number; memberCount: number; scoringType: string;
+  id: string;
+  name: string;
+  status: string;
+  buyIn: number;
+  maxTeams: number;
+  memberCount: number;
+  scoringType: string;
   myTeam?: { name: string };
 }
 
@@ -33,10 +41,13 @@ export default function DashboardScreen() {
     });
   }, []);
 
-  function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const index = Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH);
-    setActiveIndex(index);
-  }
+  const onViewRef = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) setActiveIndex(viewableItems[0].index ?? 0);
+  });
+  const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 60 });
+
+  const entryLabel = (buyIn: number) =>
+    buyIn === 0 ? "Free" : "$" + (buyIn / 100).toLocaleString() + " entry";
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -46,84 +57,78 @@ export default function DashboardScreen() {
           <TouchableOpacity style={styles.createBtn} onPress={() => router.push("/(app)/create-league" as any)}>
             <Text style={styles.createBtnText}>+ Create</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.searchBtn} onPress={() => router.push("/(app)/discover")}>
+          <TouchableOpacity style={styles.searchBtn} onPress={() => router.push("/(app)/discover" as any)}>
             <Text style={styles.searchBtnText}>Search</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>My Leagues</Text>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.sectionHeading}>My Leagues</Text>
 
         {loading ? (
-          <ActivityIndicator color="#4f7cff" style={{ marginTop: 24 }} />
+          <ActivityIndicator color="#4f7cff" style={{ marginTop: 40 }} />
         ) : leagues.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No leagues yet</Text>
-            <Text style={styles.emptyBody}>Create a league or join one via invite code.</Text>
+            <Text style={styles.emptyBody}>Create a league or join one via invite link.</Text>
           </View>
         ) : (
-          <View>
-            <ScrollView
+          <>
+            <FlatList
+              data={leagues}
+              keyExtractor={(item) => item.id}
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
-              onScroll={onScroll}
-              scrollEventThrottle={16}
-              snapToInterval={CARD_WIDTH + 12}
+              snapToInterval={CARD_W + 16}
               decelerationRate="fast"
-            >
-              {leagues.map((league) => (
+              contentContainerStyle={{ paddingRight: 20 }}
+              onViewableItemsChanged={onViewRef.current}
+              viewabilityConfig={viewConfig.current}
+              renderItem={({ item }) => (
                 <TouchableOpacity
-                  key={league.id}
-                  style={[styles.leagueCard, { width: CARD_WIDTH }]}
-                  onPress={() => router.push(`/(app)/league/${league.id}` as any)}
+                  style={styles.leagueCard}
+                  onPress={() => router.push(("/(app)/league/" + item.id) as any)}
                   activeOpacity={0.85}
                 >
                   <View style={styles.cardHeader}>
-                    <Text style={styles.leagueName} numberOfLines={1}>{league.name}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: `${STATUS_COLOR[league.status]}22` }]}>
-                      <Text style={[styles.statusText, { color: STATUS_COLOR[league.status] }]}>{league.status}</Text>
+                    <Text style={styles.leagueName} numberOfLines={1}>{item.name}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[item.status] + "22" }]}>
+                      <Text style={[styles.statusText, { color: STATUS_COLOR[item.status] }]}>{item.status}</Text>
                     </View>
                   </View>
-                  {league.myTeam && <Text style={styles.teamName}>{league.myTeam.name}</Text>}
+                  {item.myTeam && <Text style={styles.teamName}>{item.myTeam.name}</Text>}
                   <View style={styles.cardMeta}>
-                    <Text style={styles.entryAmount}>${league.buyIn} entry</Text>
+                    <Text style={[styles.metaEntry, { color: "#22c55e" }]}>{entryLabel(item.buyIn)}</Text>
                     <Text style={styles.metaDot}> · </Text>
-                    <Text style={styles.metaItem}>{league.memberCount}/{league.maxTeams} teams</Text>
+                    <Text style={styles.metaItem}>{item.memberCount}/{item.maxTeams} teams</Text>
                     <Text style={styles.metaDot}> · </Text>
-                    <Text style={styles.metaItem}>{league.scoringType === "FULL_PPR" ? "Full PPR" : "Half PPR"}</Text>
-                  </View>
-                  <View style={styles.cardArrow}>
-                    <Text style={styles.cardArrowText}>View League →</Text>
+                    <Text style={styles.metaItem}>{item.scoringType === "FULL_PPR" ? "Full PPR" : "Half PPR"}</Text>
                   </View>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              )}
+            />
             {leagues.length > 1 && (
               <View style={styles.dots}>
-                {leagues.map((_, i) => (
+                {leagues.map((_: any, i: number) => (
                   <View key={i} style={[styles.dot, i === activeIndex && styles.dotActive]} />
                 ))}
               </View>
             )}
-          </View>
+          </>
         )}
+
+        <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/(app)/rankings" as any)} style={styles.rankingsWrapper}>
+          <LinearGradient colors={["#ef4444", "#7c3aed", "#4f7cff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.rankingsBtn}>
+            <Text style={styles.rankingsText}>Rivyl Rankings</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity onPress={() => router.push("/(app)/profile" as any)}>
           <Text style={styles.username}>@{user?.username}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/(app)/rankings" as any)} activeOpacity={0.85}>
-          <LinearGradient
-            colors={["#4f7cff", "#9333ea", "#e63946"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.rankingsBtn}
-          >
-            <Text style={styles.rankingsBtnText}>Rivyl Rankings</Text>
-          </LinearGradient>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -133,35 +138,34 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0d0f14" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#2a3347", backgroundColor: "#161b24" },
-  logo: { fontSize: 22, fontWeight: "800", color: "#4f7cff", letterSpacing: -0.5 },
-  headerActions: { flexDirection: "row", gap: 8, alignItems: "center" },
+  logo: { fontSize: 20, fontWeight: "700", color: "#4f7cff", letterSpacing: -0.5 },
+  headerActions: { flexDirection: "row", gap: 8 },
   createBtn: { backgroundColor: "#4f7cff", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
-  createBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
-  searchBtn: { backgroundColor: "#e63946", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
-  searchBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  createBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  searchBtn: { backgroundColor: "#ef4444", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
+  searchBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: "700", color: "#e8eaf0", marginBottom: 14 },
-  emptyState: { alignItems: "center", marginTop: 40, padding: 24, backgroundColor: "#161b24", borderRadius: 12, borderWidth: 1, borderColor: "#2a3347" },
-  emptyTitle: { fontSize: 16, fontWeight: "600", color: "#e8eaf0", marginBottom: 6 },
-  emptyBody: { fontSize: 13, color: "#8a95a8", textAlign: "center" },
-  leagueCard: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 14, padding: 18, marginRight: 12 },
+  scrollContent: { paddingTop: 20, paddingBottom: 40 },
+  sectionHeading: { fontSize: 20, fontWeight: "700", color: "#e8eaf0", paddingHorizontal: 20, marginBottom: 14 },
+  emptyState: { alignItems: "center", marginTop: 60, paddingHorizontal: 20 },
+  emptyTitle: { fontSize: 17, fontWeight: "600", color: "#e8eaf0", marginBottom: 8 },
+  emptyBody: { fontSize: 14, color: "#8a95a8", textAlign: "center" },
+  leagueCard: { width: CARD_W, backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 16, padding: 20, marginLeft: 20, marginBottom: 4 },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   leagueName: { fontSize: 17, fontWeight: "700", color: "#e8eaf0", flex: 1, marginRight: 8 },
   statusBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   statusText: { fontSize: 11, fontWeight: "700" },
-  teamName: { fontSize: 13, color: "#8a95a8", marginBottom: 10 },
+  teamName: { fontSize: 13, color: "#8a95a8", marginBottom: 12 },
   cardMeta: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
-  entryAmount: { fontSize: 12, color: "#22c55e", fontWeight: "600" },
+  metaEntry: { fontSize: 13, fontWeight: "700" },
   metaItem: { fontSize: 12, color: "#8a95a8" },
   metaDot: { fontSize: 12, color: "#374151" },
-  cardArrow: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#2a3347" },
-  cardArrowText: { fontSize: 13, color: "#4f7cff", fontWeight: "600" },
-  dots: { flexDirection: "row", justifyContent: "center", marginTop: 12, gap: 6 },
+  dots: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 12 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#2a3347" },
   dotActive: { backgroundColor: "#4f7cff", width: 18 },
-  footer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderTopWidth: 1, borderTopColor: "#2a3347" },
-  username: { fontSize: 13, color: "#8a95a8" },
-  rankingsBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
-  rankingsBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  rankingsWrapper: { marginHorizontal: 20, marginTop: 28 },
+  rankingsBtn: { borderRadius: 14, padding: 18, alignItems: "center" },
+  rankingsText: { color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: 0.5 },
+  footer: { paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "#2a3347" },
+  username: { fontSize: 14, color: "#8a95a8", fontWeight: "600" },
 });
