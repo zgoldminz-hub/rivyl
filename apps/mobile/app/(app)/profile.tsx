@@ -140,10 +140,10 @@ function computeRank(stats: Stats): RankInfo {
 
 function RankSortIcon({ color }: { color: string }) {
   return (
-    <View style={{ alignItems: "center", gap: 2 }}>
-      <Text style={{ color, fontSize: 8, lineHeight: 9 }}>▲</Text>
-      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color }} />
-      <Text style={{ color, fontSize: 8, lineHeight: 9 }}>▼</Text>
+    <View style={{ alignItems: "center", gap: 1 }}>
+      <Text style={{ color, fontSize: 5, lineHeight: 6 }}>▲</Text>
+      <View style={{ width: 3, height: 3, borderRadius: 2, backgroundColor: color }} />
+      <Text style={{ color, fontSize: 5, lineHeight: 6 }}>▼</Text>
     </View>
   );
 }
