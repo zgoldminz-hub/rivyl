@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { api } from "../../../../../src/api/client";
 
-interface RosterSlotDetail { id: string; playerId: string; slot: string; points: number; statLine?: string; }
+interface RosterSlotDetail {
+  id: string; playerId: string; slot: string; points: number; statLine?: string;
+  name?: string; position?: string; team?: string | null; headshotUrl?: string;
+}
 interface TeamDetail { id: string; name: string; user: { username: string }; rosterSlots: RosterSlotDetail[]; }
 interface MatchupData { id: string; week: number; homeScore: number; awayScore: number; isPlayoff: boolean; homeTeam: TeamDetail; awayTeam: TeamDetail; }
 
@@ -36,7 +39,7 @@ export default function MatchupDetailScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}><Text style={styles.back}>← Standings</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()}><Text style={styles.back}>← Back</Text></TouchableOpacity>
         <Text style={styles.title}>Week {matchup.week}{matchup.isPlayoff ? " · Playoff" : ""}</Text>
         <View style={{ width: 80 }} />
       </View>
@@ -46,11 +49,13 @@ export default function MatchupDetailScreen() {
         <View style={styles.scoreCard}>
           <View style={styles.scoreTeam}>
             <Text style={styles.teamName} numberOfLines={1}>{matchup.homeTeam.name}</Text>
+            <Text style={styles.teamUser}>@{matchup.homeTeam.user.username}</Text>
             <Text style={[styles.bigScore, homeWinning && styles.winnerScore]}>{matchup.homeScore.toFixed(2)}</Text>
           </View>
           <Text style={styles.vs}>vs</Text>
           <View style={[styles.scoreTeam, { alignItems: "flex-end" }]}>
             <Text style={styles.teamName} numberOfLines={1}>{matchup.awayTeam.name}</Text>
+            <Text style={[styles.teamUser, { textAlign: "right" }]}>@{matchup.awayTeam.user.username}</Text>
             <Text style={[styles.bigScore, !homeWinning && styles.winnerScore]}>{matchup.awayScore.toFixed(2)}</Text>
           </View>
         </View>
@@ -72,15 +77,29 @@ export default function MatchupDetailScreen() {
 }
 
 function PlayerRow({ slot, muted }: { slot: RosterSlotDetail; muted?: boolean }) {
-  const color = POS_COLORS[slot.slot] ?? "#6b7280";
+  const [imgErr, setImgErr] = useState(false);
+  const slotColor = POS_COLORS[slot.slot] ?? "#6b7280";
+  const posColor = POS_COLORS[slot.position ?? ""] ?? slotColor;
+  const displayName = slot.name ?? slot.playerId;
   return (
-    <View style={[styles.playerRow, muted && { opacity: 0.5 }]}>
-      <View style={[styles.slotBadge, { backgroundColor: `${color}20` }]}>
-        <Text style={[styles.slotText, { color }]}>{slot.slot}</Text>
+    <View style={[styles.playerRow, muted && styles.playerRowMuted]}>
+      {slot.headshotUrl && !imgErr ? (
+        <Image source={{ uri: slot.headshotUrl }} style={styles.headshot} onError={() => setImgErr(true)} />
+      ) : (
+        <View style={[styles.headshot, styles.headshotFallback, { backgroundColor: `${posColor}25` }]}>
+          <Text style={[styles.headshotFallbackText, { color: posColor }]}>{slot.position ?? slot.slot}</Text>
+        </View>
+      )}
+      <View style={[styles.slotBadge, { backgroundColor: `${slotColor}20` }]}>
+        <Text style={[styles.slotText, { color: slotColor }]}>{slot.slot}</Text>
       </View>
       <View style={styles.playerInfo}>
-        <Text style={styles.playerName} numberOfLines={1}>{slot.playerId}</Text>
-        {slot.statLine ? <Text style={styles.statLine}>{slot.statLine}</Text> : null}
+        <Text style={styles.playerName} numberOfLines={1}>{displayName}</Text>
+        {slot.statLine ? (
+          <Text style={styles.statLine}>{slot.statLine}</Text>
+        ) : (slot.position || slot.team) ? (
+          <Text style={styles.statLine}>{[slot.position, slot.team].filter(Boolean).join(" · ")}</Text>
+        ) : null}
       </View>
       <Text style={[styles.pts, slot.points > 0 && styles.ptsActive]}>{slot.points.toFixed(1)}</Text>
     </View>
@@ -96,12 +115,17 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
   scoreCard: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 12, padding: 20, flexDirection: "row", alignItems: "center", marginBottom: 20 },
   scoreTeam: { flex: 1 },
-  teamName: { fontSize: 14, fontWeight: "600", color: "#e8eaf0", marginBottom: 4 },
+  teamName: { fontSize: 14, fontWeight: "700", color: "#e8eaf0", marginBottom: 2 },
+  teamUser: { fontSize: 11, color: "#8a95a8", marginBottom: 6 },
   bigScore: { fontSize: 34, fontWeight: "800", color: "#8a95a8" },
   winnerScore: { color: "#22c55e" },
   vs: { fontSize: 14, color: "#8a95a8", marginHorizontal: 12 },
   rosterLabel: { fontSize: 11, fontWeight: "600", color: "#8a95a8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 8 },
   playerRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: "#1a2133" },
+  playerRowMuted: { opacity: 0.45 },
+  headshot: { width: 36, height: 36, borderRadius: 18 },
+  headshotFallback: { justifyContent: "center", alignItems: "center" },
+  headshotFallbackText: { fontSize: 8, fontWeight: "700" },
   slotBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3, minWidth: 40, alignItems: "center" },
   slotText: { fontSize: 10, fontWeight: "700" },
   playerInfo: { flex: 1 },

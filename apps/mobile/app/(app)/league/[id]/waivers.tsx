@@ -6,8 +6,12 @@ import { api } from "../../../../src/api/client";
 import Button from "../../../../src/components/Button";
 
 interface SleeperPlayer { player_id: string; full_name: string; position: string; team: string | null; injury_status: string | null; }
-interface WaiverClaim { id: string; addPlayerId: string; dropPlayerId: string | null; status: string; }
-interface RosterSlot { id: string; playerId: string; slot: string; }
+interface WaiverClaim {
+  id: string; addPlayerId: string; dropPlayerId: string | null; status: string;
+  addPlayer?: { name: string } | null;
+  dropPlayer?: { name: string } | null;
+}
+interface RosterSlot { id: string; playerId: string; slot: string; name?: string; position?: string; team?: string | null; }
 
 const POS_COLORS: Record<string, string> = { QB: "#f59e0b", RB: "#22c55e", WR: "#4f7cff", TE: "#a78bfa", K: "#6b7280", DEF: "#ef4444" };
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"];
@@ -133,7 +137,10 @@ export default function WaiversScreen() {
             {myRoster.map((s) => (
               <View key={s.id} style={styles.playerRow}>
                 <View style={styles.slotBadge}><Text style={styles.slotText}>{s.slot}</Text></View>
-                <Text style={[styles.playerName, { flex: 1 }]}>{s.playerId}</Text>
+                <View style={styles.playerInfo}>
+                  <Text style={styles.playerName}>{s.name ?? s.playerId}</Text>
+                  {s.position ? <Text style={styles.playerMeta}>{s.position}{s.team ? ` · ${s.team}` : ""}</Text> : null}
+                </View>
                 <TouchableOpacity style={styles.dropBtn} onPress={() => dropPlayer(s.playerId)}>
                   <Text style={styles.dropBtnText}>Drop</Text>
                 </TouchableOpacity>
@@ -150,8 +157,8 @@ export default function WaiversScreen() {
               <View key={c.id} style={styles.claimRow}>
                 <View style={styles.claimInfo}>
                   <Text style={styles.claimLabel}>Add</Text>
-                  <Text style={styles.claimPlayer}>{c.addPlayerId}</Text>
-                  {c.dropPlayerId && <><Text style={styles.claimLabel}>Drop</Text><Text style={[styles.claimPlayer, { color: "#ef4444" }]}>{c.dropPlayerId}</Text></>}
+                  <Text style={styles.claimPlayer}>{c.addPlayer?.name ?? c.addPlayerId}</Text>
+                  {c.dropPlayerId && <><Text style={styles.claimLabel}>Drop</Text><Text style={[styles.claimPlayer, { color: "#ef4444" }]}>{c.dropPlayer?.name ?? c.dropPlayerId}</Text></>}
                 </View>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => cancelClaim(c.id)}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -175,7 +182,7 @@ export default function WaiversScreen() {
               </TouchableOpacity>
               {myRoster.map((s) => (
                 <TouchableOpacity key={s.id} style={[styles.dropOption, dropPlayerId === s.playerId && styles.dropOptionActive]} onPress={() => setDropPlayerId(s.playerId)}>
-                  <Text style={styles.dropOptionText}>{s.playerId} ({s.slot})</Text>
+                  <Text style={styles.dropOptionText}>{s.name ?? s.playerId} ({s.slot})</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
