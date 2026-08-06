@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import Stripe from "stripe";
 import { prisma } from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth";
+import { enrichPlayers } from "../lib/sleeperApi";
 import { getPlayers } from "../lib/sleeperApi";
 
 const router = Router();

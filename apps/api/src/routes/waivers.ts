@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { body, validationResult } from "express-validator";
 import { prisma } from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth";
-import { getPlayers, searchPlayers } from "../lib/sleeperApi";
+import { getPlayers, searchPlayers, enrichPlayers } from "../lib/sleeperApi";
 
 const router = Router();
 router.use(requireAuth);
@@ -47,7 +47,16 @@ router.get("/:leagueId/claims", async (req: AuthRequest, res: Response): Promise
     orderBy: { priority: "asc" },
   });
 
-  res.json({ ok: true, data: { claims } });
+  const ids = claims.flatMap((c) => [c.addPlayerId, c.dropPlayerId].filter(Boolean) as string[]);
+  const playerInfo = await enrichPlayers(ids);
+
+  const enrichedClaims = claims.map((c) => ({
+    ...c,
+    addPlayer: playerInfo[c.addPlayerId] ?? null,
+    dropPlayer: c.dropPlayerId ? playerInfo[c.dropPlayerId] ?? null : null,
+  }));
+
+  res.json({ ok: true, data: { claims: enrichedClaims } });
 });
 
 // ─── POST /waivers/:leagueId/claim ────────────────────────────────────────────

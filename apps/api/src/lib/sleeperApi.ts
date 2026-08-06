@@ -73,3 +73,31 @@ export async function searchPlayers(
     .sort((a, b) => (a.search_rank ?? 999999) - (b.search_rank ?? 999999))
     .slice(0, 50);
 }
+
+export interface EnrichedPlayer {
+  name: string;
+  position: string;
+  team: string | null;
+  headshotUrl: string;
+}
+
+export async function enrichPlayers(
+  playerIds: string[]
+): Promise<Record<string, EnrichedPlayer>> {
+  const players = await getPlayers();
+  const result: Record<string, EnrichedPlayer> = {};
+  for (const id of playerIds) {
+    const p = players.get(id);
+    result[id] = {
+      name: p
+        ? p.position === "DEF"
+          ? `${p.team ?? id} D/ST`
+          : p.full_name
+        : id,
+      position: p?.position ?? "UNK",
+      team: p?.team ?? null,
+      headshotUrl: `https://sleepercdn.com/content/nfl/players/thumb/${id}.jpg`,
+    };
+  }
+  return result;
+}

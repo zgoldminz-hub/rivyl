@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth";
 import { getWeekStats, getPlayerPoints, getCurrentNFLWeek, getWeekLockTime } from "../lib/scoringEngine";
 import { getStandings, generatePlayoffBracket, resolvePlayoffRound, REGULAR_SEASON_WEEKS } from "../lib/scheduleGenerator";
+import { enrichPlayers } from "../lib/sleeperApi";
 
 const router = Router();
 router.use(requireAuth);
@@ -87,11 +88,18 @@ router.get("/:leagueId/matchup/:matchupId", async (req: AuthRequest, res: Respon
     return lines.join(" · ");
   }
 
+  const allIds = [
+    ...matchup.homeTeam.rosterSlots.map((s) => s.playerId),
+    ...matchup.awayTeam.rosterSlots.map((s) => s.playerId),
+  ];
+  const playerInfo = await enrichPlayers(allIds);
+
   function enrichRoster(slots: any[]) {
     return slots.map((s) => {
       const raw = stats[s.playerId];
       return {
         ...s,
+        ...playerInfo[s.playerId],
         points: raw ? getPlayerPoints(raw, matchup!.league.scoringType) : 0,
         statLine: raw ? buildStatLine(raw) : "",
       };
@@ -136,8 +144,12 @@ router.get("/:leagueId/my-team", async (req: AuthRequest, res: Response): Promis
     // Not available yet
   }
 
+  const playerIds = team.rosterSlots.map((s) => s.playerId);
+  const playerInfo = await enrichPlayers(playerIds);
+
   const enriched = team.rosterSlots.map((s) => ({
     ...s,
+    ...playerInfo[s.playerId],
     points: stats[s.playerId]
       ? getPlayerPoints(stats[s.playerId], team.league.scoringType)
       : null,
