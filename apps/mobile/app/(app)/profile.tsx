@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -551,4 +550,3 @@ const ranksModal = StyleSheet.create({
   req: { fontSize: 12, color: "#e8eaf0", fontWeight: "600", marginBottom: 4 },
   desc: { fontSize: 12, lineHeight: 17 },
 });
-
