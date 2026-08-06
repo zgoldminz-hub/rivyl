@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, useColorScheme,
+  TextInput, Alert, ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -33,38 +33,16 @@ const VISIBILITY_OPTIONS = [
   { label: "Public", value: "PUBLIC" },
 ];
 
-const DARK = {
-  bg: "#0d0f14", surface: "#161b24", border: "#2a3347",
-  text: "#e8eaf0", sub: "#8a95a8", muted: "#4a5568", accent: "#4f7cff",
-  inputBg: "#161b24",
-};
-const LIGHT = {
-  bg: "#f4f6fb", surface: "#ffffff", border: "#e2e8f0",
-  text: "#111827", sub: "#64748b", muted: "#94a3b8", accent: "#4f7cff",
-  inputBg: "#ffffff",
-};
-
-function useTheme() {
-  const scheme = useColorScheme();
-  return scheme === "dark" ? DARK : LIGHT;
-}
-
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  const C = useTheme();
   return (
-    <TouchableOpacity
-      style={[styles.chip, { backgroundColor: C.surface, borderColor: C.border }, selected && { backgroundColor: C.accent, borderColor: C.accent }]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Text style={[styles.chipText, { color: selected ? "#fff" : C.sub }]}>{label}</Text>
+    <TouchableOpacity style={[styles.chip, selected && styles.chipSelected]} onPress={onPress} activeOpacity={0.7}>
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 export default function CreateLeagueScreen() {
   const router = useRouter();
-  const C = useTheme();
   const [name, setName] = useState("");
   const [maxTeams, setMaxTeams] = useState(10);
   const [buyIn, setBuyIn] = useState(0);
@@ -101,30 +79,30 @@ export default function CreateLeagueScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: C.bg }]}>
-      <View style={[styles.header, { backgroundColor: C.surface, borderBottomColor: C.border }]}>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[styles.back, { color: C.sub }]}>Back</Text>
+          <Text style={styles.back}>Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: C.text }]}>Create League</Text>
+        <Text style={styles.headerTitle}>Create League</Text>
         <View style={{ width: 50 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: C.sub }]}>League Name</Text>
+          <Text style={styles.sectionLabel}>League Name</Text>
           <TextInput
-            style={[styles.input, { backgroundColor: C.inputBg, borderColor: C.border, color: C.text }]}
+            style={styles.input}
             value={name}
             onChangeText={setName}
             placeholder="e.g. Bulldog HOF"
-            placeholderTextColor={C.muted}
+            placeholderTextColor="#4a5568"
             maxLength={40}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: C.sub }]}>Number of Teams</Text>
+          <Text style={styles.sectionLabel}>Number of Teams</Text>
           <View style={styles.chips}>
             {TEAM_OPTIONS.map((n) => (
               <Chip key={n} label={String(n)} selected={maxTeams === n} onPress={() => setMaxTeams(n)} />
@@ -133,7 +111,7 @@ export default function CreateLeagueScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: C.sub }]}>Scoring</Text>
+          <Text style={styles.sectionLabel}>Scoring</Text>
           <View style={styles.chips}>
             {SCORING_OPTIONS.map((o) => (
               <Chip key={o.value} label={o.label} selected={scoringType === o.value} onPress={() => setScoringType(o.value)} />
@@ -142,7 +120,7 @@ export default function CreateLeagueScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: C.sub }]}>Draft Type</Text>
+          <Text style={styles.sectionLabel}>Draft Type</Text>
           <View style={styles.chips}>
             {DRAFT_OPTIONS.map((o) => (
               <Chip key={o.value} label={o.label} selected={draftType === o.value} onPress={() => setDraftType(o.value)} />
@@ -151,7 +129,7 @@ export default function CreateLeagueScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: C.sub }]}>Buy-In</Text>
+          <Text style={styles.sectionLabel}>Buy-In</Text>
           <View style={styles.chips}>
             {BUY_IN_OPTIONS.map((o) => (
               <Chip key={o.value} label={o.label} selected={buyIn === o.value} onPress={() => setBuyIn(o.value)} />
@@ -161,7 +139,7 @@ export default function CreateLeagueScreen() {
 
         {buyIn > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: C.sub }]}>Payout Structure</Text>
+            <Text style={styles.sectionLabel}>Payout Structure</Text>
             <View style={styles.chips}>
               {PAYOUT_OPTIONS.map((o) => (
                 <Chip key={o.value} label={o.label} selected={payoutPreset === o.value} onPress={() => setPayoutPreset(o.value)} />
@@ -171,7 +149,7 @@ export default function CreateLeagueScreen() {
         )}
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: C.sub }]}>Visibility</Text>
+          <Text style={styles.sectionLabel}>Visibility</Text>
           <View style={styles.chips}>
             {VISIBILITY_OPTIONS.map((o) => (
               <Chip key={o.value} label={o.label} selected={visibility === o.value} onPress={() => setVisibility(o.value)} />
@@ -180,26 +158,21 @@ export default function CreateLeagueScreen() {
         </View>
 
         {buyIn > 0 && (
-          <View style={[styles.summaryCard, { backgroundColor: C.surface, borderColor: C.border }]}>
-            <Text style={[styles.summaryTitle, { color: C.sub }]}>Prize Pool Estimate</Text>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Prize Pool Estimate</Text>
             <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, { color: C.sub }]}>Total Pot</Text>
-              <Text style={[styles.summaryValue, { color: C.text }]}>${potTotal.toLocaleString()}</Text>
+              <Text style={styles.summaryLabel}>Total Pot</Text>
+              <Text style={styles.summaryValue}>${potTotal.toLocaleString()}</Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, { color: C.sub }]}>After 5% fee</Text>
-              <Text style={[styles.summaryValue, { color: C.accent }]}>${prizePool.toLocaleString()}</Text>
+              <Text style={styles.summaryLabel}>After 5% fee</Text>
+              <Text style={[styles.summaryValue, { color: "#4f7cff" }]}>${prizePool.toLocaleString()}</Text>
             </View>
             <Text style={styles.paidNote}>Paid buy-ins are processed on rivyl.com</Text>
           </View>
         )}
 
-        <TouchableOpacity
-          style={[styles.createBtn, { backgroundColor: C.accent }, loading && { opacity: 0.6 }]}
-          onPress={handleCreate}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
+        <TouchableOpacity style={[styles.createBtn, loading && { opacity: 0.6 }]} onPress={handleCreate} disabled={loading} activeOpacity={0.85}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.createBtnText}>Create League</Text>}
         </TouchableOpacity>
       </ScrollView>
@@ -208,23 +181,25 @@ export default function CreateLeagueScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1 },
-  back: { fontSize: 14, width: 50 },
-  headerTitle: { fontSize: 16, fontWeight: "700" },
+  safe: { flex: 1, backgroundColor: "#0d0f14" },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#2a3347", backgroundColor: "#161b24" },
+  back: { fontSize: 14, color: "#8a95a8", width: 50 },
+  headerTitle: { fontSize: 16, fontWeight: "700", color: "#e8eaf0" },
   content: { padding: 20, paddingBottom: 60 },
   section: { marginBottom: 24 },
-  sectionLabel: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 },
-  input: { borderWidth: 1, borderRadius: 10, padding: 14, fontSize: 15 },
+  sectionLabel: { fontSize: 12, fontWeight: "600", color: "#8a95a8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 },
+  input: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 10, padding: 14, color: "#e8eaf0", fontSize: 15 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
-  chipText: { fontSize: 13, fontWeight: "600" },
-  summaryCard: { borderWidth: 1, borderRadius: 12, padding: 16, marginBottom: 24 },
-  summaryTitle: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 },
+  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: "#2a3347", backgroundColor: "#161b24" },
+  chipSelected: { backgroundColor: "#4f7cff", borderColor: "#4f7cff" },
+  chipText: { fontSize: 13, color: "#8a95a8", fontWeight: "600" },
+  chipTextSelected: { color: "#fff" },
+  summaryCard: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 12, padding: 16, marginBottom: 24 },
+  summaryTitle: { fontSize: 12, fontWeight: "600", color: "#8a95a8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 },
   summaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
-  summaryLabel: { fontSize: 13 },
-  summaryValue: { fontSize: 13, fontWeight: "700" },
+  summaryLabel: { fontSize: 13, color: "#8a95a8" },
+  summaryValue: { fontSize: 13, fontWeight: "700", color: "#e8eaf0" },
   paidNote: { fontSize: 11, color: "#f59e0b", marginTop: 10 },
-  createBtn: { borderRadius: 12, padding: 16, alignItems: "center" },
+  createBtn: { backgroundColor: "#4f7cff", borderRadius: 12, padding: 16, alignItems: "center" },
   createBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });
