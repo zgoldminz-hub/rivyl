@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -204,4 +203,3 @@ const styles = StyleSheet.create({
   avatarRing: { width: 60, height: 60, borderRadius: 30, overflow: "hidden", borderWidth: 2 },
   username: { fontSize: 12, fontWeight: "600" },
 });
-

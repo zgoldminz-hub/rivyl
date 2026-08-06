@@ -1,30 +1,35 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, TextInput, Modal, Image, Clipboard,
+  ActivityIndicator, Alert, TextInput, Modal, Image,
+  Clipboard, useColorScheme,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { api } from "../../../src/api/client";
 import Button from "../../../src/components/Button";
 
-const POS_COLORS: Record<string, string> = {
-  QB: "#f59e0b", RB: "#22c55e", WR: "#4f7cff", TE: "#a78bfa",
-  K: "#6b7280", DEF: "#ef4444", FLEX: "#22c55e", BENCH: "#374151",
+// ─── Theme ────────────────────────────────────────────────────────────────────
+
+const DARK = {
+  bg: "#0d0f14", surface: "#161b24", border: "#2a3347",
+  innerBorder: "#1a2133", text: "#e8eaf0", sub: "#8a95a8",
+  muted: "#4a5568", accent: "#4f7cff", badgeText: "#ffffff",
+  inputBg: "#161b24", modalBg: "rgba(0,0,0,0.75)",
 };
-const STARTER_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "K", "DEF"];
-const STATUS_COLOR: Record<string, string> = {
-  SETUP: "#6b7280", DRAFTING: "#f59e0b", ACTIVE: "#22c55e",
-  PLAYOFFS: "#a78bfa", COMPLETE: "#374151",
+const LIGHT = {
+  bg: "#f4f6fb", surface: "#ffffff", border: "#e2e8f0",
+  innerBorder: "#f0f4f8", text: "#111827", sub: "#64748b",
+  muted: "#94a3b8", accent: "#4f7cff", badgeText: "#000000",
+  inputBg: "#ffffff", modalBg: "rgba(0,0,0,0.5)",
 };
-const PAYOUT_LABEL: Record<string, string> = {
-  WINNER_TAKES_ALL: "Winner Takes All",
-  TOP_TWO: "Top 2 (70% / 30%)",
-  TOP_THREE: "Top 3 (60% / 25% / 15%)",
-};
-const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"];
-const TABS = ["My Team", "Matchup", "Waivers", "Trades", "Standings", "Settings"] as const;
-type Tab = typeof TABS[number];
+
+function useTheme() {
+  const scheme = useColorScheme();
+  return scheme === "dark" ? DARK : LIGHT;
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TeamMember {
   id: string; name: string; username: string; userId: string;
@@ -75,9 +80,32 @@ interface SleeperPlayer {
   team: string | null; injury_status: string | null;
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const POS_COLORS: Record<string, string> = {
+  QB: "#f59e0b", RB: "#22c55e", WR: "#4f7cff", TE: "#a78bfa",
+  K: "#6b7280", DEF: "#ef4444", FLEX: "#22c55e", BENCH: "#374151",
+};
+const STARTER_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "K", "DEF"];
+const STATUS_COLOR: Record<string, string> = {
+  SETUP: "#6b7280", DRAFTING: "#f59e0b", ACTIVE: "#22c55e",
+  PLAYOFFS: "#a78bfa", COMPLETE: "#374151",
+};
+const PAYOUT_LABEL: Record<string, string> = {
+  WINNER_TAKES_ALL: "Winner Takes All",
+  TOP_TWO: "Top 2 (70% / 30%)",
+  TOP_THREE: "Top 3 (60% / 25% / 15%)",
+};
+const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"];
+const TABS = ["My Team", "Matchup", "Waivers", "Trades", "Standings", "Settings"] as const;
+type Tab = typeof TABS[number];
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
 export default function LeagueScreen() {
   const router = useRouter();
   const { id: leagueId } = useLocalSearchParams<{ id: string }>();
+  const C = useTheme();
   const [league, setLeague] = useState<LeagueDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("My Team");
@@ -117,49 +145,70 @@ export default function LeagueScreen() {
   }
 
   if (loading) return (
-    <SafeAreaView style={s.safe}><ActivityIndicator color="#4f7cff" style={{ flex: 1 }} /></SafeAreaView>
+    <SafeAreaView style={[s.safe, { backgroundColor: C.bg }]}>
+      <ActivityIndicator color={C.accent} style={{ flex: 1 }} />
+    </SafeAreaView>
   );
+
   if (!league) return (
-    <SafeAreaView style={s.safe}><View style={s.center}>
-      <Text style={s.errorText}>League not found</Text>
-      <TouchableOpacity onPress={() => router.back()}><Text style={s.link}>Go back</Text></TouchableOpacity>
-    </View></SafeAreaView>
+    <SafeAreaView style={[s.safe, { backgroundColor: C.bg }]}>
+      <View style={s.center}>
+        <Text style={[s.errorText]}>League not found</Text>
+        <TouchableOpacity onPress={() => router.back()}><Text style={[s.link, { color: C.accent }]}>Go back</Text></TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 
   const isActive = league.status === "ACTIVE" || league.status === "PLAYOFFS";
 
   return (
-    <SafeAreaView style={s.safe}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={{ width: 60 }}>
-          <Text style={s.back}>Back</Text>
+    <SafeAreaView style={[s.safe, { backgroundColor: C.bg }]}>
+      {/* Header */}
+      <View style={[s.header, { backgroundColor: C.surface, borderBottomColor: C.border }]}>
+        <TouchableOpacity onPress={() => router.push("/(app)/dashboard" as any)} style={s.brandBtn}>
+          <Text style={[s.brandText, { color: C.accent }]}>Rivyl Fantasy</Text>
         </TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>{league.name}</Text>
+        <Text style={[s.headerTitle, { color: C.text }]} numberOfLines={1}>{league.name}</Text>
         <View style={[s.statusPill, { backgroundColor: `${STATUS_COLOR[league.status] ?? "#6b7280"}22` }]}>
           <Text style={[s.statusText, { color: STATUS_COLOR[league.status] ?? "#6b7280" }]}>{league.status}</Text>
         </View>
       </View>
 
+      {/* SETUP */}
       {league.status === "SETUP" && (
         <SetupView league={league} startingDraft={startingDraft} onStartDraft={startDraft} onCopyInvite={copyInvite} />
       )}
+
+      {/* DRAFTING */}
       {league.status === "DRAFTING" && (
         <ScrollView style={s.scroll} contentContainerStyle={s.content}>
-          <TouchableOpacity style={s.primaryBtn} onPress={() => router.push(`/(app)/league/${leagueId}/draft` as any)}>
+          <TouchableOpacity style={[s.primaryBtn, { backgroundColor: C.accent }]}
+            onPress={() => router.push(`/(app)/league/${leagueId}/draft` as any)}>
             <Text style={s.primaryBtnText}>Enter Draft Room</Text>
           </TouchableOpacity>
           <TeamsCard league={league} />
         </ScrollView>
       )}
+
+      {/* ACTIVE / PLAYOFFS — top tab bar */}
       {isActive && (
         <View style={{ flex: 1 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabBar} contentContainerStyle={s.tabBarInner}>
-            {TABS.map((t) => (
-              <TouchableOpacity key={t} style={[s.tabItem, activeTab === t && s.tabItemActive]} onPress={() => setActiveTab(t)}>
-                <Text style={[s.tabLabel, activeTab === t && s.tabLabelActive]}>{t}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {/* Fixed-height tab bar wrapper prevents grey space expansion */}
+          <View style={[s.tabBarWrap, { backgroundColor: C.surface, borderBottomColor: C.border }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabBarInner}>
+              {TABS.map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  style={[s.tabItem, activeTab === t && { borderBottomColor: C.accent, borderBottomWidth: 2 }]}
+                  onPress={() => setActiveTab(t)}
+                >
+                  <Text style={[s.tabLabel, { color: activeTab === t ? C.text : C.muted },
+                    activeTab === t && s.tabLabelActive]}>{t}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
           {activeTab === "My Team" && <MyTeamTab leagueId={leagueId!} />}
           {activeTab === "Matchup" && <MatchupTab leagueId={leagueId!} />}
           {activeTab === "Waivers" && <WaiversTab leagueId={leagueId!} />}
@@ -168,34 +217,42 @@ export default function LeagueScreen() {
           {activeTab === "Settings" && <SettingsTab league={league} onCopyInvite={copyInvite} />}
         </View>
       )}
+
       {league.status === "COMPLETE" && (
-        <View style={s.center}><Text style={s.emptyText}>This season is complete.</Text></View>
+        <View style={s.center}><Text style={[s.emptyText, { color: C.sub }]}>This season is complete.</Text></View>
       )}
     </SafeAreaView>
   );
 }
 
+// ─── Setup View ───────────────────────────────────────────────────────────────
+
 function SetupView({ league, startingDraft, onStartDraft, onCopyInvite }: {
-  league: LeagueDetail; startingDraft: boolean; onStartDraft: () => void; onCopyInvite: () => void;
+  league: LeagueDetail; startingDraft: boolean;
+  onStartDraft: () => void; onCopyInvite: () => void;
 }) {
+  const C = useTheme();
   const pot = league.buyIn * league.maxTeams;
   const prize = Math.floor(pot * 0.95);
   return (
     <ScrollView style={s.scroll} contentContainerStyle={s.content}>
       {league.isCommissioner && (
-        <TouchableOpacity style={[s.primaryBtn, league.memberCount < 2 && s.disabledBtn]} onPress={league.memberCount >= 2 ? onStartDraft : undefined}>
+        <TouchableOpacity
+          style={[s.primaryBtn, { backgroundColor: C.accent }, league.memberCount < 2 && s.disabledBtn]}
+          onPress={league.memberCount >= 2 ? onStartDraft : undefined}
+        >
           <Text style={s.primaryBtnText}>{startingDraft ? "Starting…" : "Start Draft"}</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity style={s.card} onPress={onCopyInvite} activeOpacity={0.75}>
-        <Text style={s.cardTitle}>Invite Code</Text>
+      <TouchableOpacity style={[s.card, { backgroundColor: C.surface, borderColor: C.border }]} onPress={onCopyInvite} activeOpacity={0.75}>
+        <Text style={[s.cardTitle, { color: C.sub }]}>Invite Code</Text>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Text style={s.inviteCode}>{league.inviteCode}</Text>
-          <Text style={s.hint}>Tap to copy</Text>
+          <Text style={[s.inviteCode, { color: C.accent }]}>{league.inviteCode}</Text>
+          <Text style={[s.hint, { color: C.sub }]}>Tap to copy</Text>
         </View>
       </TouchableOpacity>
-      <View style={s.card}>
-        <Text style={s.cardTitle}>Settings</Text>
+      <View style={[s.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+        <Text style={[s.cardTitle, { color: C.sub }]}>Settings</Text>
         <InfoRow label="Buy-In" value={`$${league.buyIn}`} accent />
         <InfoRow label="Teams" value={`${league.memberCount} / ${league.maxTeams}`} />
         <InfoRow label="Scoring" value={league.scoringType === "FULL_PPR" ? "Full PPR" : "Half PPR"} />
@@ -203,17 +260,17 @@ function SetupView({ league, startingDraft, onStartDraft, onCopyInvite }: {
         <InfoRow label="Visibility" value={league.visibility === "PUBLIC" ? "Public" : "Private"} />
       </View>
       {league.buyIn > 0 && (
-        <View style={s.card}>
-          <Text style={s.cardTitle}>Prize Pool</Text>
+        <View style={[s.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <Text style={[s.cardTitle, { color: C.sub }]}>Prize Pool</Text>
           <InfoRow label="Total Pot" value={`$${pot.toLocaleString()}`} />
           <InfoRow label="After 5% fee" value={`$${prize.toLocaleString()}`} accent />
           {(league.payoutSplit?.length ?? 0) > 0 && (
             <View style={{ marginTop: 10 }}>
-              <Text style={s.subLabel}>{PAYOUT_LABEL[league.payoutPreset]}</Text>
+              <Text style={[s.subLabel, { color: C.sub }]}>{PAYOUT_LABEL[league.payoutPreset]}</Text>
               {league.payoutSplit.map((sp) => (
                 <View key={sp.place} style={s.payoutRow}>
-                  <Text style={s.payoutPlace}>{sp.place === 1 ? "1st" : sp.place === 2 ? "2nd" : "3rd"} Place</Text>
-                  <Text style={s.payoutAmt}>${Math.floor(prize * sp.percent / 100).toLocaleString()}</Text>
+                  <Text style={[s.payoutPlace, { color: C.text }]}>{sp.place === 1 ? "1st" : sp.place === 2 ? "2nd" : "3rd"} Place</Text>
+                  <Text style={[s.payoutAmt, { color: C.accent }]}>${Math.floor(prize * sp.percent / 100).toLocaleString()}</Text>
                 </View>
               ))}
             </View>
@@ -225,29 +282,35 @@ function SetupView({ league, startingDraft, onStartDraft, onCopyInvite }: {
   );
 }
 
+// ─── Teams Card ───────────────────────────────────────────────────────────────
+
 function TeamsCard({ league }: { league: LeagueDetail }) {
+  const C = useTheme();
   return (
-    <View style={s.card}>
-      <Text style={s.cardTitle}>Teams ({league.memberCount}/{league.maxTeams})</Text>
+    <View style={[s.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+      <Text style={[s.cardTitle, { color: C.sub }]}>Teams ({league.memberCount}/{league.maxTeams})</Text>
       {(league.teams ?? []).map((t) => (
-        <View key={t.id} style={s.teamRow}>
+        <View key={t.id} style={[s.teamRow, { borderBottomColor: C.innerBorder }]}>
           <View>
-            <Text style={s.teamName}>{t.name}</Text>
-            <Text style={s.teamUsername}>@{t.username}</Text>
+            <Text style={[s.teamName, { color: C.text }]}>{t.name}</Text>
+            <Text style={[s.teamUsername, { color: C.sub }]}>@{t.username}</Text>
           </View>
           {t.isCommissioner && <Text style={s.commLabel}>Comm.</Text>}
         </View>
       ))}
       {Array.from({ length: Math.max(0, league.maxTeams - (league.memberCount ?? 0)) }).map((_, i) => (
-        <View key={`open-${i}`} style={[s.teamRow, { opacity: 0.3 }]}>
-          <Text style={{ color: "#8a95a8", fontSize: 14 }}>Open slot</Text>
+        <View key={`open-${i}`} style={[s.teamRow, { borderBottomColor: C.innerBorder, opacity: 0.3 }]}>
+          <Text style={[{ color: C.sub, fontSize: 14 }]}>Open slot</Text>
         </View>
       ))}
     </View>
   );
 }
 
+// ─── My Team Tab ──────────────────────────────────────────────────────────────
+
 function MyTeamTab({ leagueId }: { leagueId: string }) {
+  const C = useTheme();
   const [team, setTeam] = useState<{ id: string; name: string } | null>(null);
   const [roster, setRoster] = useState<RosterSlot[]>([]);
   const [week, setWeek] = useState(1);
@@ -285,14 +348,19 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
 
   async function saveLineup() {
     setSaving(true);
-    const res = await api.post(`/season/${leagueId}/lineup`, { slots: roster.map((r) => ({ playerId: r.playerId, slot: r.slot })) });
+    const res = await api.post(`/season/${leagueId}/lineup`, {
+      slots: roster.map((r) => ({ playerId: r.playerId, slot: r.slot })),
+    });
     setSaving(false);
     if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 2000); }
     else Alert.alert("Error", (res as any).error ?? "Failed to save lineup");
   }
 
   if (loading) return <LoadingView />;
-  const starters = roster.filter((r) => r.slot !== "BENCH").sort((a, b) => STARTER_ORDER.indexOf(a.slot) - STARTER_ORDER.indexOf(b.slot));
+
+  const starters = roster
+    .filter((r) => r.slot !== "BENCH")
+    .sort((a, b) => STARTER_ORDER.indexOf(a.slot) - STARTER_ORDER.indexOf(b.slot));
   const bench = roster.filter((r) => r.slot === "BENCH");
   const pts = starters.reduce((n, r) => n + (r.points ?? 0), 0);
 
@@ -300,39 +368,60 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
     <ScrollView style={s.scroll} contentContainerStyle={s.content}>
       <View style={s.teamHeaderRow}>
         <View>
-          <Text style={s.myTeamName}>{team?.name}</Text>
-          <Text style={s.weekLabel}>Week {week}</Text>
+          <Text style={[s.myTeamName, { color: C.text }]}>{team?.name}</Text>
+          <Text style={[s.weekLabel, { color: C.sub }]}>Week {week}</Text>
         </View>
-        {isLocked ? <Text style={s.lockedLabel}>Locked</Text> : (
-          <TouchableOpacity style={s.saveBtn} onPress={saveLineup} disabled={saving}>
+        {isLocked ? (
+          <Text style={[s.lockedLabel, { color: C.sub }]}>Locked</Text>
+        ) : (
+          <TouchableOpacity style={[s.saveBtn, { backgroundColor: C.accent }]} onPress={saveLineup} disabled={saving}>
             <Text style={s.saveBtnText}>{saving ? "Saving…" : saved ? "Saved ✓" : "Save"}</Text>
           </TouchableOpacity>
         )}
       </View>
-      {!isLocked && <Text style={s.swapHint}>{swap ? "Tap another player to swap" : "Tap a player to change lineup"}</Text>}
-      <Text style={s.sectionTitle}>Starters · {pts.toFixed(1)} pts</Text>
-      {starters.map((r) => <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} onPress={() => handlePress(r)} />)}
-      <Text style={[s.sectionTitle, { marginTop: 16 }]}>Bench</Text>
-      {bench.map((r) => <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} onPress={() => handlePress(r)} />)}
+      {!isLocked && (
+        <Text style={[s.swapHint, { color: C.accent }]}>
+          {swap ? "Tap another player to swap" : "Tap a player to change lineup"}
+        </Text>
+      )}
+      <Text style={[s.sectionTitle, { color: C.sub }]}>Starters · {pts.toFixed(1)} pts</Text>
+      {starters.map((r) => (
+        <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} onPress={() => handlePress(r)} />
+      ))}
+      <Text style={[s.sectionTitle, { color: C.sub, marginTop: 16 }]}>Bench</Text>
+      {bench.map((r) => (
+        <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} onPress={() => handlePress(r)} />
+      ))}
     </ScrollView>
   );
 }
 
+// ─── Matchup Tab ──────────────────────────────────────────────────────────────
+
 function MatchupTab({ leagueId }: { leagueId: string }) {
+  const C = useTheme();
   const [matchup, setMatchup] = useState<MatchupDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const teamRes = await api.get<{ team: { id: string }; currentWeek: number }>(`/season/${leagueId}/my-team`);
+      const teamRes = await api.get<{ team: { id: string }; currentWeek: number }>(
+        `/season/${leagueId}/my-team`
+      );
       if (!teamRes.ok) { setEmpty(true); setLoading(false); return; }
       const { team, currentWeek } = teamRes.data;
-      const wRes = await api.get<{ matchups: MatchupSummary[] }>(`/season/${leagueId}/matchups/${currentWeek}`);
+      const wRes = await api.get<{ matchups: MatchupSummary[] }>(
+        `/season/${leagueId}/matchups/${currentWeek}`
+      );
       if (!wRes.ok) { setEmpty(true); setLoading(false); return; }
-      const mine = wRes.data.matchups.find((m) => m.homeTeam.id === team.id || m.awayTeam.id === team.id);
+      const mine = wRes.data.matchups.find(
+        (m) => m.homeTeam.id === team.id || m.awayTeam.id === team.id
+      );
       if (!mine) { setEmpty(true); setLoading(false); return; }
-      const dRes = await api.get<{ matchup: MatchupDetail }>(`/season/${leagueId}/matchup/${mine.id}`);
+      const dRes = await api.get<{ matchup: MatchupDetail }>(
+        `/season/${leagueId}/matchup/${mine.id}`
+      );
       if (dRes.ok) setMatchup(dRes.data.matchup);
       else setEmpty(true);
       setLoading(false);
@@ -341,41 +430,50 @@ function MatchupTab({ leagueId }: { leagueId: string }) {
   }, [leagueId]);
 
   if (loading) return <LoadingView />;
-  if (empty || !matchup) return <View style={s.center}><Text style={s.emptyText}>No matchup found for this week.</Text></View>;
+  if (empty || !matchup) return (
+    <View style={s.center}><Text style={[s.emptyText, { color: C.sub }]}>No matchup found for this week.</Text></View>
+  );
 
   const homeWin = matchup.homeScore >= matchup.awayScore;
-  const sortSlots = (slots: RosterSlot[]) => slots.filter((sl) => sl.slot !== "BENCH").sort((a, b) => STARTER_ORDER.indexOf(a.slot) - STARTER_ORDER.indexOf(b.slot));
+  const sortSlots = (slots: RosterSlot[]) =>
+    slots.filter((sl) => sl.slot !== "BENCH").sort((a, b) => STARTER_ORDER.indexOf(a.slot) - STARTER_ORDER.indexOf(b.slot));
   const benchSlots = (slots: RosterSlot[]) => slots.filter((sl) => sl.slot === "BENCH");
 
   return (
     <ScrollView style={s.scroll} contentContainerStyle={s.content}>
-      <View style={s.scoreCard}>
+      <View style={[s.scoreCard, { backgroundColor: C.surface, borderColor: C.border }]}>
         <View style={s.scoreHalf}>
-          <Text style={s.scoreTeamName} numberOfLines={1}>{matchup.homeTeam.name}</Text>
-          <Text style={s.scoreUser}>@{matchup.homeTeam.user.username}</Text>
-          <Text style={[s.bigScore, homeWin && s.winScore]}>{matchup.homeScore.toFixed(2)}</Text>
+          <Text style={[s.scoreTeamName, { color: C.text }]} numberOfLines={1}>{matchup.homeTeam.name}</Text>
+          <Text style={[s.scoreUser, { color: C.sub }]}>@{matchup.homeTeam.user.username}</Text>
+          <Text style={[s.bigScore, { color: C.sub }, homeWin && s.winScore]}>{matchup.homeScore.toFixed(2)}</Text>
         </View>
-        <Text style={s.vs}>vs</Text>
+        <Text style={[s.vs, { color: C.sub }]}>vs</Text>
         <View style={[s.scoreHalf, { alignItems: "flex-end" }]}>
-          <Text style={s.scoreTeamName} numberOfLines={1}>{matchup.awayTeam.name}</Text>
-          <Text style={s.scoreUser}>@{matchup.awayTeam.user.username}</Text>
-          <Text style={[s.bigScore, !homeWin && s.winScore]}>{matchup.awayScore.toFixed(2)}</Text>
+          <Text style={[s.scoreTeamName, { color: C.text }]} numberOfLines={1}>{matchup.awayTeam.name}</Text>
+          <Text style={[s.scoreUser, { color: C.sub }]}>@{matchup.awayTeam.user.username}</Text>
+          <Text style={[s.bigScore, { color: C.sub }, !homeWin && s.winScore]}>{matchup.awayScore.toFixed(2)}</Text>
         </View>
       </View>
-      <Text style={s.rosterLabel}>{matchup.homeTeam.name}</Text>
+
+      <Text style={[s.rosterLabel, { color: C.sub }]}>{matchup.homeTeam.name}</Text>
       {sortSlots(matchup.homeTeam.rosterSlots).map((sl) => <PlayerCard key={sl.id} slot={sl} showStats />)}
-      <Text style={[s.rosterLabel, { opacity: 0.5, marginTop: 4 }]}>Bench</Text>
+      <Text style={[s.rosterLabel, { color: C.sub, opacity: 0.5, marginTop: 4 }]}>Bench</Text>
       {benchSlots(matchup.homeTeam.rosterSlots).map((sl) => <PlayerCard key={sl.id} slot={sl} muted showStats />)}
-      <View style={s.divider} />
-      <Text style={s.rosterLabel}>{matchup.awayTeam.name}</Text>
+
+      <View style={[s.divider, { backgroundColor: C.border }]} />
+
+      <Text style={[s.rosterLabel, { color: C.sub }]}>{matchup.awayTeam.name}</Text>
       {sortSlots(matchup.awayTeam.rosterSlots).map((sl) => <PlayerCard key={sl.id} slot={sl} showStats />)}
-      <Text style={[s.rosterLabel, { opacity: 0.5, marginTop: 4 }]}>Bench</Text>
+      <Text style={[s.rosterLabel, { color: C.sub, opacity: 0.5, marginTop: 4 }]}>Bench</Text>
       {benchSlots(matchup.awayTeam.rosterSlots).map((sl) => <PlayerCard key={sl.id} slot={sl} muted showStats />)}
     </ScrollView>
   );
 }
 
+// ─── Waivers Tab ──────────────────────────────────────────────────────────────
+
 function WaiversTab({ leagueId }: { leagueId: string }) {
+  const C = useTheme();
   const [subTab, setSubTab] = useState<"browse" | "claims">("browse");
   const [players, setPlayers] = useState<SleeperPlayer[]>([]);
   const [claims, setClaims] = useState<WaiverClaim[]>([]);
@@ -415,10 +513,15 @@ function WaiversTab({ leagueId }: { leagueId: string }) {
   async function submitClaim() {
     if (!claimTarget) return;
     setClaiming(true);
-    const res = await api.post(`/waivers/${leagueId}/claim`, { addPlayerId: claimTarget.player_id, dropPlayerId: dropId || undefined });
+    const res = await api.post(`/waivers/${leagueId}/claim`, {
+      addPlayerId: claimTarget.player_id,
+      dropPlayerId: dropId || undefined,
+    });
     setClaiming(false);
-    if (res.ok) { setClaims((prev) => [...prev, (res as any).data.claim]); setClaimTarget(null); setDropId(""); }
-    else Alert.alert("Error", (res as any).error ?? "Failed to submit claim");
+    if (res.ok) {
+      setClaims((prev) => [...prev, (res as any).data.claim]);
+      setClaimTarget(null); setDropId("");
+    } else Alert.alert("Error", (res as any).error ?? "Failed to submit claim");
   }
 
   async function cancelClaim(id: string) {
@@ -440,49 +543,58 @@ function WaiversTab({ leagueId }: { leagueId: string }) {
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={s.subTabRow}>
-        <TouchableOpacity style={[s.subTab, subTab === "browse" && s.subTabActive]} onPress={() => setSubTab("browse")}>
-          <Text style={[s.subTabText, subTab === "browse" && s.subTabTextActive]}>Free Agents</Text>
+      <View style={[s.subTabRow, { borderBottomColor: C.border }]}>
+        <TouchableOpacity style={[s.subTab, subTab === "browse" && { borderBottomWidth: 2, borderBottomColor: C.accent }]} onPress={() => setSubTab("browse")}>
+          <Text style={[s.subTabText, { color: subTab === "browse" ? C.accent : C.muted }]}>Free Agents</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.subTab, subTab === "claims" && s.subTabActive]} onPress={() => setSubTab("claims")}>
-          <Text style={[s.subTabText, subTab === "claims" && s.subTabTextActive]}>
+        <TouchableOpacity style={[s.subTab, subTab === "claims" && { borderBottomWidth: 2, borderBottomColor: C.accent }]} onPress={() => setSubTab("claims")}>
+          <Text style={[s.subTabText, { color: subTab === "claims" ? C.accent : C.muted }]}>
             My Claims{claims.length > 0 ? ` (${claims.length})` : ""}
           </Text>
         </TouchableOpacity>
       </View>
+
       <ScrollView style={s.scroll} contentContainerStyle={s.content}>
         {subTab === "browse" && (
           <>
-            <TextInput style={s.searchInput} placeholder="Search players…" placeholderTextColor="#4a5568" value={search} onChangeText={setSearch} />
+            <TextInput
+              style={[s.searchInput, { backgroundColor: C.inputBg, borderColor: C.border, color: C.text }]}
+              placeholder="Search players…" placeholderTextColor={C.muted}
+              value={search} onChangeText={setSearch}
+            />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
               {POSITIONS.map((p) => (
-                <TouchableOpacity key={p} style={[s.posBtn, pos === p && s.posBtnActive]} onPress={() => setPos(p)}>
-                  <Text style={[s.posBtnText, pos === p && s.posBtnTextActive]}>{p}</Text>
+                <TouchableOpacity key={p}
+                  style={[s.posBtn, { backgroundColor: C.surface, borderColor: C.border }, pos === p && { backgroundColor: C.accent, borderColor: C.accent }]}
+                  onPress={() => setPos(p)}>
+                  <Text style={[s.posBtnText, { color: pos === p ? "#fff" : C.muted }]}>{p}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
             {players.map((p) => {
-              const color = (POS_COLORS as any)[p.position] ?? "#6b7280";
+              const color = POS_COLORS[p.position] ?? "#6b7280";
               return (
-                <View key={p.player_id} style={s.playerRow}>
-                  <View style={[s.slotBadge, { backgroundColor: `${color}20` }]}>
-                    <Text style={[s.slotText, { color }]}>{p.position}</Text>
+                <View key={p.player_id} style={[s.playerRow, { backgroundColor: C.surface, borderColor: C.border }]}>
+                  <View style={[s.slotBadge, { backgroundColor: color }]}>
+                    <Text style={[s.slotText, { color: "#fff" }]}>{p.position}</Text>
                   </View>
                   <View style={s.playerInfo}>
-                    <Text style={s.playerName}>{p.full_name}</Text>
-                    <Text style={s.playerMeta}>{p.team ?? "FA"}{p.injury_status ? ` · ${p.injury_status}` : ""}</Text>
+                    <Text style={[s.playerName, { color: C.text }]}>{p.full_name}</Text>
+                    <Text style={[s.playerMeta, { color: C.sub }]}>{p.team ?? "FA"}{p.injury_status ? ` · ${p.injury_status}` : ""}</Text>
                   </View>
-                  <TouchableOpacity style={s.claimBtn} onPress={() => { setClaimTarget(p); setDropId(""); }}>
+                  <TouchableOpacity style={[s.claimBtn, { backgroundColor: C.accent }]} onPress={() => { setClaimTarget(p); setDropId(""); }}>
                     <Text style={s.claimBtnText}>Claim</Text>
                   </TouchableOpacity>
                 </View>
               );
             })}
-            <Text style={[s.sectionTitle, { marginTop: 20 }]}>My Roster — Drop Players</Text>
+            <Text style={[s.sectionTitle, { color: C.sub, marginTop: 20 }]}>My Roster — Drop Players</Text>
             {myRoster.map((sl) => (
-              <View key={sl.id} style={s.playerRow}>
-                <View style={s.slotBadge}><Text style={s.slotText}>{sl.slot}</Text></View>
-                <Text style={[s.playerName, { flex: 1 }]}>{sl.name ?? sl.playerId}</Text>
+              <View key={sl.id} style={[s.playerRow, { backgroundColor: C.surface, borderColor: C.border }]}>
+                <View style={[s.slotBadge, { backgroundColor: POS_COLORS[sl.slot] ?? "#374151" }]}>
+                  <Text style={[s.slotText, { color: "#fff" }]}>{sl.slot}</Text>
+                </View>
+                <Text style={[s.playerName, { flex: 1, color: C.text }]}>{sl.name ?? sl.playerId}</Text>
                 <TouchableOpacity style={s.dropBtn} onPress={() => dropPlayer(sl.playerId)}>
                   <Text style={s.dropBtnText}>Drop</Text>
                 </TouchableOpacity>
@@ -490,37 +602,39 @@ function WaiversTab({ leagueId }: { leagueId: string }) {
             ))}
           </>
         )}
+
         {subTab === "claims" && (
           <>
             {claims.length === 0 ? (
-              <Text style={[s.emptyText, { marginTop: 40 }]}>No pending claims.</Text>
+              <Text style={[s.emptyText, { color: C.sub, marginTop: 40 }]}>No pending claims.</Text>
             ) : claims.map((c) => (
-              <View key={c.id} style={s.claimRow}>
+              <View key={c.id} style={[s.claimRow, { backgroundColor: C.surface, borderColor: C.border }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.claimLine}>+ {c.addPlayer?.name ?? c.addPlayerId}</Text>
+                  <Text style={[s.claimLine, { color: C.text }]}>+ {c.addPlayer?.name ?? c.addPlayerId}</Text>
                   {c.dropPlayerId && <Text style={[s.claimLine, { color: "#ef4444" }]}>- {c.dropPlayer?.name ?? c.dropPlayerId}</Text>}
                 </View>
-                <TouchableOpacity style={s.cancelBtn} onPress={() => cancelClaim(c.id)}>
-                  <Text style={s.cancelBtnText}>Cancel</Text>
+                <TouchableOpacity style={[s.cancelBtn, { borderColor: C.border }]} onPress={() => cancelClaim(c.id)}>
+                  <Text style={[s.cancelBtnText, { color: C.sub }]}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             ))}
           </>
         )}
       </ScrollView>
+
       <Modal visible={!!claimTarget} transparent animationType="slide" onRequestClose={() => setClaimTarget(null)}>
-        <View style={s.modalOverlay}>
-          <View style={s.modalBox}>
-            <Text style={s.modalTitle}>Claim {claimTarget?.full_name}</Text>
-            <Text style={s.modalSub}>{claimTarget?.position} · {claimTarget?.team ?? "FA"}</Text>
-            <Text style={s.sectionTitle}>Drop a player (optional)</Text>
+        <View style={[s.modalOverlay, { backgroundColor: C.modalBg }]}>
+          <View style={[s.modalBox, { backgroundColor: C.surface }]}>
+            <Text style={[s.modalTitle, { color: C.text }]}>Claim {claimTarget?.full_name}</Text>
+            <Text style={[s.modalSub, { color: C.sub }]}>{claimTarget?.position} · {claimTarget?.team ?? "FA"}</Text>
+            <Text style={[s.sectionTitle, { color: C.sub }]}>Drop a player (optional)</Text>
             <ScrollView style={{ maxHeight: 180, marginBottom: 16 }}>
-              <TouchableOpacity style={[s.dropOption, dropId === "" && s.dropOptionActive]} onPress={() => setDropId("")}>
-                <Text style={s.dropOptionText}>— No drop —</Text>
+              <TouchableOpacity style={[s.dropOption, { backgroundColor: C.bg, borderColor: C.border }, dropId === "" && { borderColor: C.accent, backgroundColor: `${C.accent}12` }]} onPress={() => setDropId("")}>
+                <Text style={[s.dropOptionText, { color: C.text }]}>— No drop —</Text>
               </TouchableOpacity>
               {myRoster.map((sl) => (
-                <TouchableOpacity key={sl.id} style={[s.dropOption, dropId === sl.playerId && s.dropOptionActive]} onPress={() => setDropId(sl.playerId)}>
-                  <Text style={s.dropOptionText}>{sl.name ?? sl.playerId} ({sl.slot})</Text>
+                <TouchableOpacity key={sl.id} style={[s.dropOption, { backgroundColor: C.bg, borderColor: C.border }, dropId === sl.playerId && { borderColor: C.accent, backgroundColor: `${C.accent}12` }]} onPress={() => setDropId(sl.playerId)}>
+                  <Text style={[s.dropOptionText, { color: C.text }]}>{sl.name ?? sl.playerId} ({sl.slot})</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -535,7 +649,10 @@ function WaiversTab({ leagueId }: { leagueId: string }) {
   );
 }
 
+// ─── Trades Tab ───────────────────────────────────────────────────────────────
+
 function TradesTab({ leagueId }: { leagueId: string }) {
+  const C = useTheme();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [myTeamId, setMyTeamId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -564,7 +681,7 @@ function TradesTab({ leagueId }: { leagueId: string }) {
   }
 
   if (loading) return <LoadingView />;
-  if (trades.length === 0) return <View style={s.center}><Text style={s.emptyText}>No trades yet.</Text></View>;
+  if (trades.length === 0) return <View style={s.center}><Text style={[s.emptyText, { color: C.sub }]}>No trades yet.</Text></View>;
 
   const pending = trades.filter((t) => t.status === "PENDING");
   const history = trades.filter((t) => t.status !== "PENDING");
@@ -573,38 +690,38 @@ function TradesTab({ leagueId }: { leagueId: string }) {
     <ScrollView style={s.scroll} contentContainerStyle={s.content}>
       {pending.length > 0 && (
         <>
-          <Text style={s.sectionTitle}>Pending</Text>
+          <Text style={[s.sectionTitle, { color: C.sub }]}>Pending</Text>
           {pending.map((t) => {
             const myItems = t.items.filter((i) => i.fromTeamId === myTeamId);
             const theirItems = t.items.filter((i) => i.fromTeamId !== myTeamId);
             return (
-              <View key={t.id} style={s.tradeCard}>
-                <Text style={s.tradeHeader}>{t.proposingTeam.name} → {t.receivingTeam.name}</Text>
+              <View key={t.id} style={[s.tradeCard, { backgroundColor: C.surface, borderColor: C.border }]}>
+                <Text style={[s.tradeHeader, { color: C.text }]}>{t.proposingTeam.name} → {t.receivingTeam.name}</Text>
                 <View style={s.tradeBody}>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.tradeLabel}>You give</Text>
-                    {myItems.map((i) => <Text key={i.id} style={s.tradePlayer}>{i.playerId}</Text>)}
+                    <Text style={[s.tradeLabel, { color: C.sub }]}>You give</Text>
+                    {myItems.map((i) => <Text key={i.id} style={[s.tradePlayer, { color: C.text }]}>{i.playerId}</Text>)}
                   </View>
                   <View style={{ flex: 1, alignItems: "flex-end" }}>
-                    <Text style={s.tradeLabel}>You get</Text>
-                    {theirItems.map((i) => <Text key={i.id} style={s.tradePlayer}>{i.playerId}</Text>)}
+                    <Text style={[s.tradeLabel, { color: C.sub }]}>You get</Text>
+                    {theirItems.map((i) => <Text key={i.id} style={[s.tradePlayer, { color: C.text }]}>{i.playerId}</Text>)}
                   </View>
                 </View>
-                {t.note ? <Text style={s.tradeNote}>{t.note}</Text> : null}
+                {t.note ? <Text style={[s.tradeNote, { color: C.sub }]}>{t.note}</Text> : null}
                 <View style={s.tradeActions}>
                   {t.receivingTeamId === myTeamId && (
                     <>
                       <TouchableOpacity style={s.acceptBtn} onPress={() => accept(t.id)}>
                         <Text style={s.acceptBtnText}>Accept</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={s.rejectBtn} onPress={() => reject(t.id)}>
-                        <Text style={s.rejectBtnText}>Reject</Text>
+                      <TouchableOpacity style={[s.rejectBtn, { borderColor: C.border }]} onPress={() => reject(t.id)}>
+                        <Text style={[s.rejectBtnText, { color: C.sub }]}>Reject</Text>
                       </TouchableOpacity>
                     </>
                   )}
                   {t.proposingTeamId === myTeamId && (
-                    <TouchableOpacity style={[s.rejectBtn, { flex: 1 }]} onPress={() => cancel(t.id)}>
-                      <Text style={s.rejectBtnText}>Cancel Offer</Text>
+                    <TouchableOpacity style={[s.rejectBtn, { flex: 1, borderColor: C.border }]} onPress={() => cancel(t.id)}>
+                      <Text style={[s.rejectBtnText, { color: C.sub }]}>Cancel Offer</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -615,11 +732,11 @@ function TradesTab({ leagueId }: { leagueId: string }) {
       )}
       {history.length > 0 && (
         <>
-          <Text style={[s.sectionTitle, { marginTop: 16 }]}>History</Text>
+          <Text style={[s.sectionTitle, { color: C.sub, marginTop: 16 }]}>History</Text>
           {history.map((t) => (
-            <View key={t.id} style={[s.tradeCard, { opacity: 0.55 }]}>
-              <Text style={s.tradeHeader}>{t.proposingTeam.name} ↔ {t.receivingTeam.name}</Text>
-              <Text style={[s.tradeLabel, { marginTop: 4, color: t.status === "ACCEPTED" ? "#22c55e" : "#8a95a8" }]}>{t.status}</Text>
+            <View key={t.id} style={[s.tradeCard, { backgroundColor: C.surface, borderColor: C.border, opacity: 0.55 }]}>
+              <Text style={[s.tradeHeader, { color: C.text }]}>{t.proposingTeam.name} ↔ {t.receivingTeam.name}</Text>
+              <Text style={[s.tradeLabel, { marginTop: 4, color: t.status === "ACCEPTED" ? "#22c55e" : C.sub }]}>{t.status}</Text>
             </View>
           ))}
         </>
@@ -628,43 +745,52 @@ function TradesTab({ leagueId }: { leagueId: string }) {
   );
 }
 
+// ─── Standings Tab ────────────────────────────────────────────────────────────
+
 function StandingsTab({ leagueId }: { leagueId: string }) {
+  const C = useTheme();
   const [standings, setStandings] = useState<StandingRow[]>([]);
   const [week, setWeek] = useState(1);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get<{ standings: StandingRow[]; currentWeek: number }>(`/season/${leagueId}/standings`).then((res) => {
+    api.get<{ standings: StandingRow[]; currentWeek: number }>(
+      `/season/${leagueId}/standings`
+    ).then((res) => {
       if (res.ok) { setStandings(res.data.standings); setWeek(res.data.currentWeek); }
       setLoading(false);
     });
   }, [leagueId]);
 
   if (loading) return <LoadingView />;
+
   return (
     <ScrollView style={s.scroll} contentContainerStyle={s.content}>
-      <Text style={s.sectionTitle}>Week {week} Standings</Text>
+      <Text style={[s.sectionTitle, { color: C.sub }]}>Week {week} Standings</Text>
       {standings.map((row, i) => (
-        <View key={row.teamId} style={s.standingRow}>
-          <Text style={s.standingRank}>{i + 1}</Text>
+        <View key={row.teamId} style={[s.standingRow, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <Text style={[s.standingRank, { color: C.accent }]}>{i + 1}</Text>
           <View style={{ flex: 1 }}>
-            <Text style={s.standingName}>{row.teamName}</Text>
-            <Text style={s.standingPts}>{row.pointsFor.toFixed(1)} pts</Text>
+            <Text style={[s.standingName, { color: C.text }]}>{row.teamName}</Text>
+            <Text style={[s.standingPts, { color: C.sub }]}>{row.pointsFor.toFixed(1)} pts</Text>
           </View>
-          <Text style={s.standingRecord}>{row.wins}-{row.losses}</Text>
+          <Text style={[s.standingRecord, { color: C.text }]}>{row.wins}-{row.losses}</Text>
         </View>
       ))}
     </ScrollView>
   );
 }
 
+// ─── Settings Tab ─────────────────────────────────────────────────────────────
+
 function SettingsTab({ league, onCopyInvite }: { league: LeagueDetail; onCopyInvite: () => void }) {
+  const C = useTheme();
   const pot = league.buyIn * league.maxTeams;
   const prize = Math.floor(pot * 0.95);
   return (
     <ScrollView style={s.scroll} contentContainerStyle={s.content}>
-      <View style={s.card}>
-        <Text style={s.cardTitle}>League Settings</Text>
+      <View style={[s.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+        <Text style={[s.cardTitle, { color: C.sub }]}>League Settings</Text>
         <InfoRow label="Buy-In" value={`$${league.buyIn}`} accent />
         <InfoRow label="Teams" value={`${league.memberCount} / ${league.maxTeams}`} />
         <InfoRow label="Scoring" value={league.scoringType === "FULL_PPR" ? "Full PPR" : "Half PPR"} />
@@ -673,24 +799,24 @@ function SettingsTab({ league, onCopyInvite }: { league: LeagueDetail; onCopyInv
         <InfoRow label="Visibility" value={league.visibility === "PUBLIC" ? "Public" : "Private"} />
       </View>
       {league.buyIn > 0 && (
-        <View style={s.card}>
-          <Text style={s.cardTitle}>Prize Pool</Text>
+        <View style={[s.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <Text style={[s.cardTitle, { color: C.sub }]}>Prize Pool</Text>
           <InfoRow label="Total Pot" value={`$${pot.toLocaleString()}`} />
           <InfoRow label="After 5% fee" value={`$${prize.toLocaleString()}`} accent />
           {(league.payoutSplit?.length ?? 0) > 0 && league.payoutSplit.map((sp) => (
             <View key={sp.place} style={s.payoutRow}>
-              <Text style={s.payoutPlace}>{sp.place === 1 ? "1st" : sp.place === 2 ? "2nd" : "3rd"} Place</Text>
-              <Text style={s.payoutAmt}>${Math.floor(prize * sp.percent / 100).toLocaleString()}</Text>
+              <Text style={[s.payoutPlace, { color: C.text }]}>{sp.place === 1 ? "1st" : sp.place === 2 ? "2nd" : "3rd"} Place</Text>
+              <Text style={[s.payoutAmt, { color: C.accent }]}>${Math.floor(prize * sp.percent / 100).toLocaleString()}</Text>
             </View>
           ))}
         </View>
       )}
       {league.isCommissioner && (
-        <TouchableOpacity style={s.card} onPress={onCopyInvite} activeOpacity={0.75}>
-          <Text style={s.cardTitle}>Invite Code</Text>
+        <TouchableOpacity style={[s.card, { backgroundColor: C.surface, borderColor: C.border }]} onPress={onCopyInvite} activeOpacity={0.75}>
+          <Text style={[s.cardTitle, { color: C.sub }]}>Invite Code</Text>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={s.inviteCode}>{league.inviteCode}</Text>
-            <Text style={s.hint}>Tap to copy</Text>
+            <Text style={[s.inviteCode, { color: C.accent }]}>{league.inviteCode}</Text>
+            <Text style={[s.hint, { color: C.sub }]}>Tap to copy</Text>
           </View>
         </TouchableOpacity>
       )}
@@ -699,13 +825,24 @@ function SettingsTab({ league, onCopyInvite }: { league: LeagueDetail; onCopyInv
   );
 }
 
-function PlayerCard({ slot, selected, muted, onPress, showStats }: {
+// ─── Shared: PlayerCard ───────────────────────────────────────────────────────
+
+function PlayerCard({
+  slot, selected, muted, onPress, showStats,
+}: {
   slot: RosterSlot; selected?: boolean; muted?: boolean; showStats?: boolean; onPress?: () => void;
 }) {
+  const C = useTheme();
   const [imgErr, setImgErr] = useState(false);
-  const color = (POS_COLORS as any)[slot.slot] ?? "#6b7280";
+  const color = POS_COLORS[slot.slot] ?? "#6b7280";
+
   const inner = (
-    <View style={[s.playerRow, selected && s.playerRowSelected, muted && s.playerRowMuted]}>
+    <View style={[
+      s.playerRow,
+      { backgroundColor: C.surface, borderColor: C.border },
+      selected && { borderColor: C.accent, backgroundColor: `${C.accent}12` },
+      muted && s.playerRowMuted,
+    ]}>
       {slot.headshotUrl && !imgErr ? (
         <Image source={{ uri: slot.headshotUrl }} style={s.headshot} onError={() => setImgErr(true)} />
       ) : (
@@ -713,96 +850,126 @@ function PlayerCard({ slot, selected, muted, onPress, showStats }: {
           <Text style={[s.headshotText, { color }]}>{(slot.position ?? slot.slot).slice(0, 2)}</Text>
         </View>
       )}
-      <View style={[s.slotBadge, { backgroundColor: `${color}18` }]}>
-        <Text style={[s.slotText, { color }]}>{slot.slot}</Text>
+      {/* Solid colored background, white text in dark / black text in light */}
+      <View style={[s.slotBadge, { backgroundColor: color }]}>
+        <Text style={[s.slotText, { color: C.badgeText }]}>{slot.slot}</Text>
       </View>
       <View style={s.playerInfo}>
-        <Text style={s.playerName} numberOfLines={1}>{slot.name ?? slot.playerId}</Text>
+        <Text style={[s.playerName, { color: C.text }]} numberOfLines={1}>{slot.name ?? slot.playerId}</Text>
         {showStats && slot.statLine ? (
-          <Text style={s.playerMeta} numberOfLines={1}>{slot.statLine}</Text>
+          <Text style={[s.playerMeta, { color: C.sub }]} numberOfLines={1}>{slot.statLine}</Text>
         ) : slot.position ? (
-          <Text style={s.playerMeta}>{slot.position}{slot.team ? ` · ${slot.team}` : ""}</Text>
+          <Text style={[s.playerMeta, { color: C.sub }]}>{slot.position}{slot.team ? ` · ${slot.team}` : ""}</Text>
         ) : null}
       </View>
-      <Text style={[s.pts, (slot.points ?? 0) > 0 && s.ptsActive]}>
+      <Text style={[s.pts, { color: C.sub }, (slot.points ?? 0) > 0 && { color: C.text }]}>
         {slot.points !== null && slot.points !== undefined ? slot.points.toFixed(1) : "—"}
       </Text>
     </View>
   );
+
   if (onPress) return <TouchableOpacity onPress={onPress} activeOpacity={0.75}>{inner}</TouchableOpacity>;
   return inner;
 }
 
+// ─── Shared: InfoRow ──────────────────────────────────────────────────────────
+
 function InfoRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  const C = useTheme();
   return (
-    <View style={s.infoRow}>
-      <Text style={s.infoLabel}>{label}</Text>
-      <Text style={[s.infoValue, accent && s.infoAccent]}>{value}</Text>
+    <View style={[s.infoRow, { borderBottomColor: C.innerBorder }]}>
+      <Text style={[s.infoLabel, { color: C.sub }]}>{label}</Text>
+      <Text style={[s.infoValue, { color: C.text }, accent && { color: C.accent, fontWeight: "700" }]}>{value}</Text>
     </View>
   );
 }
 
+// ─── Shared: LoadingView ──────────────────────────────────────────────────────
+
 function LoadingView() {
-  return <View style={s.center}><ActivityIndicator color="#4f7cff" /></View>;
+  const C = useTheme();
+  return <View style={s.center}><ActivityIndicator color={C.accent} /></View>;
 }
 
+// ─── Styles (layout only — colors applied inline via theme) ───────────────────
+
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0d0f14" },
+  safe: { flex: 1 },
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 48 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   errorText: { color: "#ef4444", fontSize: 15, marginBottom: 12 },
-  link: { color: "#4f7cff", fontSize: 14 },
-  emptyText: { color: "#8a95a8", fontSize: 14, textAlign: "center" },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#2a3347", backgroundColor: "#161b24" },
-  back: { fontSize: 14, color: "#8a95a8" },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: "#e8eaf0", flex: 1, textAlign: "center", marginHorizontal: 8 },
+  link: { fontSize: 14 },
+  emptyText: { fontSize: 14, textAlign: "center" },
+
+  // Header
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  brandBtn: { width: 110 },
+  brandText: { fontSize: 13, fontWeight: "800", letterSpacing: -0.3 },
+  headerTitle: { fontSize: 14, fontWeight: "700", flex: 1, textAlign: "center", marginHorizontal: 4 },
   statusPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   statusText: { fontSize: 10, fontWeight: "700" },
-  tabBar: { borderBottomWidth: 1, borderBottomColor: "#2a3347", backgroundColor: "#161b24" },
-  tabBarInner: { paddingHorizontal: 4 },
-  tabItem: { paddingHorizontal: 16, paddingVertical: 13 },
-  tabItemActive: { borderBottomWidth: 2, borderBottomColor: "#4f7cff" },
-  tabLabel: { fontSize: 14, fontWeight: "600", color: "#4a5568" },
-  tabLabelActive: { color: "#ffffff" },
-  card: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 12, padding: 16, marginBottom: 14 },
-  cardTitle: { fontSize: 11, fontWeight: "700", color: "#8a95a8", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 },
-  sectionTitle: { fontSize: 11, fontWeight: "700", color: "#8a95a8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
-  subLabel: { fontSize: 12, color: "#8a95a8", marginBottom: 6 },
-  primaryBtn: { backgroundColor: "#4f7cff", borderRadius: 10, padding: 14, marginBottom: 12, alignItems: "center" },
+
+  // Tab bar — fixed height to prevent grey space expansion
+  tabBarWrap: { height: 46, borderBottomWidth: 1, flexShrink: 0 },
+  tabBarInner: { paddingHorizontal: 4, alignItems: "center" },
+  tabItem: { paddingHorizontal: 14, height: 46, justifyContent: "center" },
+  tabLabel: { fontSize: 13, fontWeight: "600" },
+  tabLabelActive: { fontWeight: "700" },
+
+  // Cards
+  card: { borderWidth: 1, borderRadius: 12, padding: 16, marginBottom: 14 },
+  cardTitle: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 },
+  sectionTitle: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
+  subLabel: { fontSize: 12, marginBottom: 6 },
+
+  // Buttons
+  primaryBtn: { borderRadius: 10, padding: 14, marginBottom: 12, alignItems: "center" },
   primaryBtnText: { fontSize: 15, fontWeight: "700", color: "#fff" },
   disabledBtn: { opacity: 0.4 },
-  inviteCode: { fontSize: 22, fontWeight: "800", color: "#4f7cff", letterSpacing: 2 },
-  hint: { fontSize: 12, color: "#8a95a8" },
-  infoRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#1a2133" },
-  infoLabel: { fontSize: 13, color: "#8a95a8" },
-  infoValue: { fontSize: 13, color: "#e8eaf0", fontWeight: "500" },
-  infoAccent: { color: "#4f7cff", fontWeight: "700" },
+
+  // Invite
+  inviteCode: { fontSize: 22, fontWeight: "800", letterSpacing: 2 },
+  hint: { fontSize: 12 },
+
+  // InfoRow
+  infoRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1 },
+  infoLabel: { fontSize: 13 },
+  infoValue: { fontSize: 13, fontWeight: "500" },
+
+  // Payout
   payoutRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
-  payoutPlace: { fontSize: 13, color: "#e8eaf0" },
-  payoutAmt: { fontSize: 13, fontWeight: "700", color: "#4f7cff" },
-  teamRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#1a2133" },
-  teamName: { fontSize: 14, fontWeight: "600", color: "#e8eaf0" },
-  teamUsername: { fontSize: 12, color: "#8a95a8" },
+  payoutPlace: { fontSize: 13 },
+  payoutAmt: { fontSize: 13, fontWeight: "700" },
+
+  // Teams
+  teamRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1 },
+  teamName: { fontSize: 14, fontWeight: "600" },
+  teamUsername: { fontSize: 12 },
   commLabel: { fontSize: 11, color: "#f59e0b", backgroundColor: "rgba(245,158,11,0.12)", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+
+  // My Team
   teamHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  myTeamName: { fontSize: 16, fontWeight: "700", color: "#e8eaf0" },
-  weekLabel: { fontSize: 12, color: "#8a95a8", marginTop: 2 },
-  lockedLabel: { fontSize: 12, color: "#8a95a8" },
-  saveBtn: { backgroundColor: "#4f7cff", borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
+  myTeamName: { fontSize: 16, fontWeight: "700" },
+  weekLabel: { fontSize: 12, marginTop: 2 },
+  lockedLabel: { fontSize: 12 },
+  saveBtn: { borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
   saveBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
-  swapHint: { fontSize: 12, color: "#4f7cff", textAlign: "center", marginBottom: 10 },
-  scoreCard: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 12, padding: 20, flexDirection: "row", alignItems: "center", marginBottom: 16 },
+  swapHint: { fontSize: 12, textAlign: "center", marginBottom: 10 },
+
+  // Matchup
+  scoreCard: { borderWidth: 1, borderRadius: 12, padding: 20, flexDirection: "row", alignItems: "center", marginBottom: 16 },
   scoreHalf: { flex: 1 },
-  scoreTeamName: { fontSize: 14, fontWeight: "600", color: "#e8eaf0" },
-  scoreUser: { fontSize: 12, color: "#8a95a8", marginBottom: 4 },
-  bigScore: { fontSize: 32, fontWeight: "800", color: "#8a95a8" },
+  scoreTeamName: { fontSize: 14, fontWeight: "600" },
+  scoreUser: { fontSize: 12, marginBottom: 4 },
+  bigScore: { fontSize: 32, fontWeight: "800" },
   winScore: { color: "#22c55e" },
-  vs: { fontSize: 12, color: "#8a95a8", marginHorizontal: 12 },
-  rosterLabel: { fontSize: 11, fontWeight: "600", color: "#8a95a8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 8 },
-  divider: { height: 1, backgroundColor: "#2a3347", marginVertical: 16 },
-  playerRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 8, marginBottom: 6 },
-  playerRowSelected: { borderColor: "#4f7cff", backgroundColor: "rgba(79,124,255,0.08)" },
+  vs: { fontSize: 12, marginHorizontal: 12 },
+  rosterLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 8 },
+  divider: { height: 1, marginVertical: 16 },
+
+  // Player card
+  playerRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderWidth: 1, borderRadius: 8, marginBottom: 6 },
   playerRowMuted: { opacity: 0.5 },
   headshot: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#1a2133" },
   headshotFallback: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
@@ -810,49 +977,49 @@ const s = StyleSheet.create({
   slotBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3, minWidth: 40, alignItems: "center" },
   slotText: { fontSize: 10, fontWeight: "700" },
   playerInfo: { flex: 1 },
-  playerName: { fontSize: 13, fontWeight: "600", color: "#e8eaf0" },
-  playerMeta: { fontSize: 11, color: "#8a95a8", marginTop: 1 },
-  pts: { fontSize: 14, fontWeight: "700", color: "#8a95a8" },
-  ptsActive: { color: "#e8eaf0" },
-  subTabRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#2a3347" },
+  playerName: { fontSize: 13, fontWeight: "600" },
+  playerMeta: { fontSize: 11, marginTop: 1 },
+  pts: { fontSize: 14, fontWeight: "700" },
+
+  // Waivers
+  subTabRow: { flexDirection: "row", borderBottomWidth: 1 },
   subTab: { flex: 1, paddingVertical: 11, alignItems: "center" },
-  subTabActive: { borderBottomWidth: 2, borderBottomColor: "#4f7cff" },
-  subTabText: { fontSize: 13, color: "#8a95a8", fontWeight: "500" },
-  subTabTextActive: { color: "#4f7cff" },
-  searchInput: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, color: "#e8eaf0", fontSize: 14, marginBottom: 10 },
-  posBtn: { paddingHorizontal: 14, paddingVertical: 7, backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 6, marginRight: 6 },
-  posBtnActive: { backgroundColor: "#4f7cff", borderColor: "#4f7cff" },
-  posBtnText: { fontSize: 12, fontWeight: "600", color: "#8a95a8" },
-  posBtnTextActive: { color: "#fff" },
-  claimBtn: { backgroundColor: "#4f7cff", borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6 },
+  subTabText: { fontSize: 13, fontWeight: "600" },
+  searchInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 10 },
+  posBtn: { paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderRadius: 6, marginRight: 6 },
+  posBtnText: { fontSize: 12, fontWeight: "600" },
+  claimBtn: { borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6 },
   claimBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   dropBtn: { borderWidth: 1, borderColor: "#ef4444", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 },
   dropBtnText: { color: "#ef4444", fontSize: 12 },
-  claimRow: { flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 8, marginBottom: 6 },
-  claimLine: { fontSize: 13, fontWeight: "600", color: "#e8eaf0", marginBottom: 2 },
-  cancelBtn: { borderWidth: 1, borderColor: "#2a3347", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
-  cancelBtnText: { color: "#8a95a8", fontSize: 12 },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
-  modalBox: { backgroundColor: "#161b24", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: "80%" },
-  modalTitle: { fontSize: 18, fontWeight: "700", color: "#e8eaf0", marginBottom: 4 },
-  modalSub: { fontSize: 13, color: "#8a95a8", marginBottom: 16 },
-  dropOption: { padding: 12, backgroundColor: "#0d0f14", borderWidth: 1, borderColor: "#2a3347", borderRadius: 8, marginBottom: 6 },
-  dropOptionActive: { borderColor: "#4f7cff", backgroundColor: "rgba(79,124,255,0.08)" },
-  dropOptionText: { color: "#e8eaf0", fontSize: 14 },
-  tradeCard: { backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 10, padding: 14, marginBottom: 10 },
-  tradeHeader: { fontSize: 13, fontWeight: "600", color: "#e8eaf0", marginBottom: 8 },
+  claimRow: { flexDirection: "row", alignItems: "center", padding: 12, borderWidth: 1, borderRadius: 8, marginBottom: 6 },
+  claimLine: { fontSize: 13, fontWeight: "600", marginBottom: 2 },
+  cancelBtn: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
+  cancelBtnText: { fontSize: 12 },
+  modalOverlay: { flex: 1, justifyContent: "flex-end" },
+  modalBox: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: "80%" },
+  modalTitle: { fontSize: 18, fontWeight: "700", marginBottom: 4 },
+  modalSub: { fontSize: 13, marginBottom: 16 },
+  dropOption: { padding: 12, borderWidth: 1, borderRadius: 8, marginBottom: 6 },
+  dropOptionText: { fontSize: 14 },
+
+  // Trades
+  tradeCard: { borderWidth: 1, borderRadius: 10, padding: 14, marginBottom: 10 },
+  tradeHeader: { fontSize: 13, fontWeight: "600", marginBottom: 8 },
   tradeBody: { flexDirection: "row", marginBottom: 8 },
-  tradeLabel: { fontSize: 11, color: "#8a95a8", fontWeight: "600", textTransform: "uppercase", marginBottom: 4 },
-  tradePlayer: { fontSize: 13, color: "#e8eaf0" },
-  tradeNote: { fontSize: 12, color: "#8a95a8", fontStyle: "italic", marginBottom: 8 },
+  tradeLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", marginBottom: 4 },
+  tradePlayer: { fontSize: 13 },
+  tradeNote: { fontSize: 12, fontStyle: "italic", marginBottom: 8 },
   tradeActions: { flexDirection: "row", gap: 8 },
   acceptBtn: { flex: 1, backgroundColor: "#22c55e", borderRadius: 6, padding: 8, alignItems: "center" },
   acceptBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-  rejectBtn: { flex: 1, borderWidth: 1, borderColor: "#2a3347", borderRadius: 6, padding: 8, alignItems: "center" },
-  rejectBtnText: { color: "#8a95a8", fontSize: 13 },
-  standingRow: { flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: "#161b24", borderWidth: 1, borderColor: "#2a3347", borderRadius: 8, marginBottom: 6 },
-  standingRank: { fontSize: 16, fontWeight: "800", color: "#4f7cff", width: 28 },
-  standingName: { fontSize: 14, fontWeight: "600", color: "#e8eaf0" },
-  standingPts: { fontSize: 11, color: "#8a95a8" },
-  standingRecord: { fontSize: 14, fontWeight: "700", color: "#e8eaf0" },
+  rejectBtn: { flex: 1, borderWidth: 1, borderRadius: 6, padding: 8, alignItems: "center" },
+  rejectBtnText: { fontSize: 13 },
+
+  // Standings
+  standingRow: { flexDirection: "row", alignItems: "center", padding: 12, borderWidth: 1, borderRadius: 8, marginBottom: 6 },
+  standingRank: { fontSize: 16, fontWeight: "800", width: 28 },
+  standingName: { fontSize: 14, fontWeight: "600" },
+  standingPts: { fontSize: 11 },
+  standingRecord: { fontSize: 14, fontWeight: "700" },
 });

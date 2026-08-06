@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -229,4 +228,3 @@ const styles = StyleSheet.create({
   createBtn: { borderRadius: 12, padding: 16, alignItems: "center" },
   createBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });
-

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -142,4 +141,3 @@ const styles = StyleSheet.create({
   meta: { fontSize: 12, marginBottom: 8 },
   joinHint: { fontSize: 12 },
 });
-
