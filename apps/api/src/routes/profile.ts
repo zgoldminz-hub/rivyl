@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import Stripe from "stripe";
 import { prisma } from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth";
+import { getPlayers } from "../lib/sleeperApi";
 
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" });
@@ -177,7 +178,23 @@ router.get("/trophy-room", requireAuth, async (req: AuthRequest, res: Response):
   }
 
   trophies.sort((a, b) => a.finish - b.finish);
-  res.json({ ok: true, data: { trophies } });
+
+  const playerMap = await getPlayers();
+  const enriched = trophies.map(t => ({
+    ...t,
+    roster: t.roster.map(slot => {
+      const p = playerMap.get(slot.playerId);
+      return {
+        playerId: slot.playerId,
+        slot: slot.slot,
+        name: p?.full_name ?? "Unknown",
+        position: p?.position ?? slot.slot,
+        headshotUrl: `https://sleepercdn.com/content/nfl/players/thumb/${slot.playerId}.jpg`,
+      };
+    }),
+  }));
+
+  res.json({ ok: true, data: { trophies: enriched } });
 });
 
 router.get("/stats", requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
