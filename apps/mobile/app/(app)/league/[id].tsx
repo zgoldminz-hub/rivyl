@@ -382,42 +382,29 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
     });
   }, [selectedWeek]);
 
+  function canFillSlot(position: string, slotName: string): boolean {
+    if (slotName === "BENCH") return true;
+    if (slotName === "FLEX") return ["RB", "WR", "TE"].includes(position);
+    return position === slotName;
+  }
+
+  function isValidSwap(a: RosterSlot, b: RosterSlot): boolean {
+    const posA = a.position ?? a.slot;
+    const posB = b.position ?? b.slot;
+    return canFillSlot(posA, b.slot) && canFillSlot(posB, a.slot);
+  }
+
   function handlePress(slot: RosterSlot) {
     if (!editMode || slot.gameStarted) return;
     if (!swap) { setSwap(slot); return; }
     if (swap.id === slot.id) { setSwap(null); return; }
-    if (swap.gameStarted) { setSwap(null); return; }
+    if (!isValidSwap(swap, slot)) return;
     setRoster((prev) => prev.map((r) => {
       if (r.id === swap.id) return { ...r, slot: slot.slot };
       if (r.id === slot.id) return { ...r, slot: swap.slot };
       return r;
     }));
     setSwap(null);
-  }
-
-  function autoSetLineup() {
-    const getProj = (r: RosterSlot) => r.projected ?? MOCK_PROJ[r.position ?? r.slot] ?? 0;
-    const pool = [...roster].filter(r => !r.gameStarted).sort((a, b) => getProj(b) - getProj(a));
-    const locked = roster.filter(r => r.gameStarted);
-    const used = new Set<string>(locked.map(r => r.id));
-    const result: RosterSlot[] = [...locked];
-
-    for (const slotName of STARTER_ORDER) {
-      if (locked.some(r => r.slot === slotName)) continue;
-      const eligible = pool.filter(p => {
-        if (used.has(p.id)) return false;
-        if (slotName === "FLEX") return ["RB", "WR", "TE"].includes(p.position ?? "");
-        return p.position === slotName;
-      });
-      if (eligible.length > 0) {
-        used.add(eligible[0].id);
-        result.push({ ...eligible[0], slot: slotName });
-      }
-    }
-    pool.forEach(p => { if (!used.has(p.id)) result.push({ ...p, slot: "BENCH" }); });
-    setRoster(result);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   }
 
   async function saveLineup() {
@@ -530,22 +517,14 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         {/* Set Lineup + Auto Set row */}
         {!isLocked && (
           !editMode ? (
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+            <View style={{ flexDirection: "row", marginBottom: 14 }}>
               <TouchableOpacity
-                style={[s.lineupEditBar, { backgroundColor: "#C81A1A", flex: 1, marginBottom: 0 }]}
+                style={[s.lineupEditBar, { backgroundColor: "#C81A1A", marginBottom: 0, paddingHorizontal: 20 }]}
                 onPress={() => setEditMode(true)}
                 activeOpacity={0.85}
               >
                 <Ionicons name="create-outline" size={14} color="#fff" />
                 <Text style={s.lineupEditBarText}>Set Lineup</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.lineupEditBar, { flex: 0, paddingHorizontal: 16, backgroundColor: "transparent", borderWidth: 1.5, borderColor: "#C81A1A", marginBottom: 0 }]}
-                onPress={autoSetLineup}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="flash" size={14} color="#C81A1A" />
-                <Text style={[s.lineupEditBarText, { color: "#C81A1A" }]}>Auto</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -570,21 +549,28 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         )}
 
         {editMode && swap && (
-          <View style={[s.swapBanner, { backgroundColor: `${colors.accent}18`, borderColor: colors.accent }]}>
-            <Text style={[s.swapHint, { color: colors.accent }]}>Tap a player to swap with {swap.name ?? swap.slot}</Text>
-          </View>
-        )}
-        {editMode && !swap && (
-          <Text style={[s.swapHint, { color: colors.textSub, marginBottom: 10, textAlign: "center" }]}>Tap a player to move them · 🔒 = game started</Text>
+          <Text style={[s.swapHint, { color: colors.textSub, marginBottom: 8, textAlign: "center" }]}>
+            Moving {swap.name ?? swap.slot} — tap a highlighted slot
+          </Text>
         )}
 
         {starters.map((r, i) => (
-          <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} isLast={i === starters.length - 1}
+          <PlayerCard key={r.id} slot={r}
+            selected={swap?.id === r.id}
+            isLast={i === starters.length - 1}
+            editMode={editMode}
+            hasSelection={!!swap}
+            isValidTarget={!!swap && swap.id !== r.id && !r.gameStarted && isValidSwap(swap, r)}
             onPress={editMode && !r.gameStarted ? () => handlePress(r) : undefined} />
         ))}
         <Text style={[s.sectionTitle, { color: colors.textSub, marginTop: 20 }]}>Bench</Text>
         {bench.map((r, i) => (
-          <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} isLast={i === bench.length - 1}
+          <PlayerCard key={r.id} slot={r}
+            selected={swap?.id === r.id}
+            isLast={i === bench.length - 1}
+            editMode={editMode}
+            hasSelection={!!swap}
+            isValidTarget={!!swap && swap.id !== r.id && !r.gameStarted && isValidSwap(swap, r)}
             onPress={editMode && !r.gameStarted ? () => handlePress(r) : undefined} />
         ))}
       </View>
@@ -991,17 +977,22 @@ function SettingsTab({ league, onCopyInvite }: { league: LeagueDetail; onCopyInv
   );
 }
 
-function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
-  slot: RosterSlot; selected?: boolean; muted?: boolean; showStats?: boolean; onPress?: () => void; isLast?: boolean;
+function PlayerCard({ slot, selected, muted, onPress, showStats, isLast, editMode, hasSelection, isValidTarget }: {
+  slot: RosterSlot; selected?: boolean; muted?: boolean; showStats?: boolean; onPress?: () => void;
+  isLast?: boolean; editMode?: boolean; hasSelection?: boolean; isValidTarget?: boolean;
 }) {
   const { colors } = useTheme();
   const [imgErr, setImgErr] = useState(false);
+
+  const dimmed = editMode && hasSelection && !selected && !isValidTarget && !slot.gameStarted;
 
   const inner = (
     <View style={[
       s.playerRow,
       !isLast && { borderBottomWidth: 1, borderBottomColor: `${colors.accent}28` },
-      selected && { backgroundColor: `${colors.accent}14` },
+      selected && { backgroundColor: `${colors.accent}18` },
+      isValidTarget && { backgroundColor: "#22c55e12" },
+      dimmed && { opacity: 0.28 },
       muted && s.playerRowMuted,
     ]}>
       <Text style={[s.slotLabel, { color: colors.accent }]}>{slot.slot}</Text>
@@ -1043,6 +1034,22 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
           </Text>
         </View>
       </View>
+      {editMode && !slot.gameStarted && (
+        <View style={[
+          s.moveHandle,
+          selected
+            ? { backgroundColor: colors.accent }
+            : isValidTarget
+              ? { backgroundColor: "#22c55e" }
+              : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+        ]}>
+          <Ionicons
+            name={selected ? "close" : isValidTarget ? "checkmark" : "swap-vertical-outline"}
+            size={12}
+            color={selected || isValidTarget ? "#fff" : colors.textSub}
+          />
+        </View>
+      )}
     </View>
   );
 
@@ -1171,6 +1178,7 @@ const s = StyleSheet.create({
   lineupEditBar: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, paddingVertical: 10, marginBottom: 14 },
   lineupEditBarText: { fontSize: 13, fontWeight: "700", color: "#fff" },
   lockBadge: { position: "absolute", bottom: 0, right: 0, width: 15, height: 15, borderRadius: 8, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center" },
+  moveHandle: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", marginLeft: 6 },
   projScoreCol: { alignItems: "flex-end", gap: 3 },
   projScoreRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   projLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3, width: 42, textAlign: "right" },
