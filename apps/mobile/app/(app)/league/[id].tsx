@@ -424,7 +424,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
 
   return (
     <View style={{ flex: 1 }}>
-    <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: 110 }}>
+    <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: 48 }}>
       {/* ── Team Hero ── */}
       <LinearGradient
         colors={["#C81A1A18", "#7520CC18", "#1834D418"]}
@@ -432,7 +432,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         end={{ x: 1, y: 0 }}
         style={[s.teamHero, { borderBottomColor: colors.border }]}
       >
-        {/* Row 1: name + record + actions */}
+        {/* Row 1: name + record + settings */}
         <View style={s.heroTopRow}>
           <View style={{ flex: 1 }}>
             <Text style={[s.myTeamName, { color: colors.text }]} numberOfLines={1}>{team?.name}</Text>
@@ -440,24 +440,9 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
               <Text style={[s.recordText, { color: colors.textSub }]}>{record.wins}–{record.losses} · Season</Text>
             )}
           </View>
-          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-            {!isLocked && (
-              !editMode ? (
-                <TouchableOpacity style={[s.heroEditBtn, { backgroundColor: "#C81A1A" }]} onPress={() => setEditMode(true)}>
-                  <Ionicons name="create-outline" size={13} color="#fff" />
-                  <Text style={s.heroEditBtnText}>Edit</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={[s.heroEditBtn, { backgroundColor: "#22c55e" }]} onPress={saveLineup} disabled={saving}>
-                  <Ionicons name="checkmark" size={13} color="#fff" />
-                  <Text style={s.heroEditBtnText}>{saving ? "…" : "Save"}</Text>
-                </TouchableOpacity>
-              )
-            )}
-            <TouchableOpacity style={[s.settingsBtn, { borderColor: colors.border }]} onPress={() => setSettingsOpen(true)}>
-              <Ionicons name="settings-outline" size={16} color={colors.textSub} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={[s.settingsBtn, { borderColor: colors.border }]} onPress={() => setSettingsOpen(true)}>
+            <Ionicons name="settings-outline" size={16} color={colors.textSub} />
+          </TouchableOpacity>
         </View>
 
         {/* Row 2: week selector */}
@@ -517,11 +502,47 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             <Text style={[s.swapHint, { color: colors.accent }]}>Tap a player to swap with {swap.name ?? swap.slot}</Text>
           </View>
         )}
+        {/* Edit Lineup button — sits right above the player list */}
+        {!isLocked && (
+          !editMode ? (
+            <TouchableOpacity
+              style={[s.lineupEditBar, { backgroundColor: "#C81A1A" }]}
+              onPress={() => setEditMode(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="create-outline" size={16} color="#fff" />
+              <Text style={s.lineupEditBarText}>Edit Lineup</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
+              <TouchableOpacity
+                style={[s.lineupEditBar, { backgroundColor: "#22c55e", flex: 1, marginBottom: 0 }]}
+                onPress={saveLineup}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Text style={s.lineupEditBarText}>{saving ? "Saving…" : "Save Lineup"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.lineupEditBar, { flex: 0, paddingHorizontal: 20, backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}
+                onPress={() => { setEditMode(false); setSwap(null); }}
+              >
+                <Text style={[s.lineupEditBarText, { color: colors.textSub }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        )}
+
+        {editMode && swap && (
+          <View style={[s.swapBanner, { backgroundColor: `${colors.accent}18`, borderColor: colors.accent }]}>
+            <Text style={[s.swapHint, { color: colors.accent }]}>Tap a player to swap with {swap.name ?? swap.slot}</Text>
+          </View>
+        )}
         {editMode && !swap && (
           <Text style={[s.swapHint, { color: colors.textSub, marginBottom: 10, textAlign: "center" }]}>Tap a player to move them · 🔒 = game started</Text>
         )}
 
-        <Text style={[s.sectionTitle, { color: colors.textSub }]}>Starters · {pts.toFixed(1)} pts</Text>
         {starters.map((r, i) => (
           <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} isLast={i === starters.length - 1}
             onPress={editMode && !r.gameStarted ? () => handlePress(r) : undefined} />
@@ -574,40 +595,6 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         </View>
       </Modal>
     </ScrollView>
-
-    {/* ── Floating Edit Bar ── */}
-    {!isLocked && selectedWeek === currentWeek && (
-      <View style={[s.floatingBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-        {!editMode ? (
-          <TouchableOpacity
-            style={[s.floatingEditBtn, { backgroundColor: "#C81A1A" }]}
-            onPress={() => setEditMode(true)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="create-outline" size={17} color="#fff" />
-            <Text style={s.floatingBtnText}>Edit Lineup</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ flexDirection: "row", gap: 10, flex: 1 }}>
-            <TouchableOpacity
-              style={[s.floatingEditBtn, { backgroundColor: "#22c55e" }]}
-              onPress={saveLineup}
-              disabled={saving}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="checkmark" size={17} color="#fff" />
-              <Text style={s.floatingBtnText}>{saving ? "Saving…" : "Save Lineup"}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.floatingEditBtn, { flex: 0, paddingHorizontal: 22, backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border }]}
-              onPress={() => { setEditMode(false); setSwap(null); }}
-            >
-              <Text style={[s.floatingBtnText, { color: colors.textSub }]}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    )}
     </View>
   );
 }
@@ -1146,9 +1133,8 @@ const s = StyleSheet.create({
   playerName: { fontSize: 13, fontWeight: "600" },
   playerMeta: { fontSize: 11, marginTop: 1 },
   pts: { fontSize: 14, fontWeight: "700" },
-  floatingBar: { position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32, borderTopWidth: 1, flexDirection: "row" },
-  floatingEditBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 15 },
-  floatingBtnText: { fontSize: 15, fontWeight: "700", color: "#fff" },
+  lineupEditBar: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, paddingVertical: 13, marginBottom: 14 },
+  lineupEditBarText: { fontSize: 14, fontWeight: "700", color: "#fff" },
   lockBadge: { position: "absolute", bottom: 0, right: 0, width: 15, height: 15, borderRadius: 8, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center" },
   projScoreCol: { alignItems: "flex-end", gap: 3 },
   projScoreRow: { flexDirection: "row", alignItems: "center", gap: 5 },
