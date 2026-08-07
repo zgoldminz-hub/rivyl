@@ -3,6 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Alert, TextInput, Modal, Image, Clipboard,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -535,32 +536,20 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
   }
 
   async function pickFromCameraRoll() {
-    Alert.alert(
-      "Upload Team Photo",
-      "Your photo will be stored on this device and used as your team avatar. Please ensure your photo does not contain offensive, hateful, or inappropriate content.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Choose Photo",
-          onPress: async () => {
-            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!perm.granted) {
-              Alert.alert("Permission Required", "Please allow photo library access in Settings to choose a team photo.");
-              return;
-            }
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.8,
-            });
-            if (!result.canceled && result.assets?.[0]?.uri) {
-              setPendingPhotoUri(result.assets[0].uri);
-            }
-          },
-        },
-      ]
-    );
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Permission Required", "Please allow photo library access in Settings to use a custom team photo.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setPendingPhotoUri(result.assets[0].uri);
+    }
   }
 
   async function saveTeamSettings() {
@@ -809,8 +798,10 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
 
       {/* ── Team Settings Modal ── */}
       <Modal visible={settingsOpen} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <View style={[s.modalOverlay, { backgroundColor: "rgba(0,0,0,0.75)" }]}>
           <View style={[s.modalBox, { backgroundColor: colors.surface }]}>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <Text style={[s.modalTitle, { color: colors.text }]}>Team Settings</Text>
               <TouchableOpacity onPress={() => setSettingsOpen(false)}>
@@ -828,11 +819,12 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             <TouchableOpacity
               onPress={pickFromCameraRoll}
               activeOpacity={0.8}
-              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginBottom: 8 }}
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginBottom: 4 }}
             >
               <Ionicons name="image-outline" size={18} color={colors.text} />
               <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>Upload from Photos</Text>
             </TouchableOpacity>
+            <Text style={{ color: colors.textSub, fontSize: 10, textAlign: "center", marginBottom: 10 }}>No offensive or inappropriate content</Text>
 
             {pendingPhotoUri && (
               <TouchableOpacity
@@ -898,8 +890,10 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             >
               <Text style={s.primaryBtnText}>{savingSettings ? "Saving…" : "Save Changes"}</Text>
             </TouchableOpacity>
+          </ScrollView>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
     </View>
