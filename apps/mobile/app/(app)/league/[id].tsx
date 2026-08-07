@@ -338,6 +338,8 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
   const [teamName, setTeamName] = useState("");
   const [teamAbbr, setTeamAbbr] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
+  const [oppMap, setOppMap] = useState<Record<string, string>>({});
+  const [selectedPlayer, setSelectedPlayer] = useState<RosterSlot | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -388,6 +390,29 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
     });
   }, [selectedWeek]);
 
+  useEffect(() => {
+    async function fetchSchedule() {
+      try {
+        const res = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=${selectedWeek}&dates=2025`
+        );
+        const data = await res.json();
+        const map: Record<string, string> = {};
+        for (const event of (data.events ?? [])) {
+          const comp = event.competitions?.[0];
+          if (!comp) continue;
+          const home = comp.competitors?.find((c: any) => c.homeAway === "home");
+          const away = comp.competitors?.find((c: any) => c.homeAway === "away");
+          if (!home || !away) continue;
+          map[home.team.abbreviation] = `vs ${away.team.abbreviation}`;
+          map[away.team.abbreviation] = `@${home.team.abbreviation}`;
+        }
+        setOppMap(map);
+      } catch {}
+    }
+    fetchSchedule();
+  }, [selectedWeek]);
+
   function canFillSlot(position: string, slotName: string): boolean {
     if (slotName === "BENCH") return true;
     if (slotName === "FLEX") return ["RB", "WR", "TE"].includes(position);
@@ -435,8 +460,12 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
 
   if (loading) return <LoadingView />;
 
-  const starters = roster.filter((r) => r.slot !== "BENCH").sort((a, b) => STARTER_ORDER.indexOf(a.slot) - STARTER_ORDER.indexOf(b.slot));
-  const bench = roster.filter((r) => r.slot === "BENCH");
+  const enrichedRoster = roster.map((r) => ({
+    ...r,
+    opponent: r.team ? (oppMap[r.team] ?? r.opponent ?? null) : (r.opponent ?? null),
+  }));
+  const starters = enrichedRoster.filter((r) => r.slot !== "BENCH").sort((a, b) => STARTER_ORDER.indexOf(a.slot) - STARTER_ORDER.indexOf(b.slot));
+  const bench = enrichedRoster.filter((r) => r.slot === "BENCH");
   const pts = starters.reduce((n, r) => n + (r.points ?? 0), 0);
   const totalProj = starters.reduce((n, r) => n + (r.projected ?? MOCK_PROJ[r.position ?? r.slot] ?? 0), 0);
   const hasScore = starters.some(r => (r.points ?? 0) > 0);
@@ -452,17 +481,17 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         end={{ x: 1, y: 0 }}
         style={[s.teamHero, { borderBottomColor: colors.border }]}
       >
-        {/* Row 1: name + record + settings */}
+        {/* Row 1: name + gear inline + record */}
         <View style={s.heroTopRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.myTeamName, { color: colors.text }]} numberOfLines={1}>{team?.name}</Text>
-            {record && (
-              <Text style={[s.recordText, { color: colors.textSub }]}>{record.wins}–{record.losses} · Season</Text>
-            )}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <Text style={[s.myTeamName, { color: colors.text, flex: 1 }]} numberOfLines={1}>{team?.name}</Text>
+            <TouchableOpacity style={[s.settingsBtn, { borderColor: colors.border }]} onPress={() => setSettingsOpen(true)}>
+              <Ionicons name="settings-outline" size={16} color={colors.textSub} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={[s.settingsBtn, { borderColor: colors.border }]} onPress={() => setSettingsOpen(true)}>
-            <Ionicons name="settings-outline" size={16} color={colors.textSub} />
-          </TouchableOpacity>
+          {record && (
+            <Text style={[s.recordText, { color: colors.textSub }]}>{record.wins}–{record.losses}</Text>
+          )}
         </View>
 
         {/* Row 2: week selector */}
@@ -560,16 +589,15 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
           )
         )}
 
-        {/* Category header row */}
-        <View style={[s.categoryRow, { borderBottomColor: colors.border }]}>
-          <View style={{ width: 94 }}>
-            <Text style={[s.catLabel, { color: colors.textSub }]}>POS</Text>
-          </View>
+        {/* Category header row — gap: 12 mirrors playerRow gap */}
+        <View style={[s.categoryRow, { borderBottomColor: colors.border, gap: 12 }]}>
+          <Text style={[s.catLabel, { width: 32, textAlign: "center", color: colors.textSub }]}>POS</Text>
+          <View style={{ width: 38 }} />
           <Text style={[s.catLabel, { flex: 1, color: colors.textSub }]}>PLAYER</Text>
           <Text style={[s.catLabel, { width: 50, textAlign: "center", color: colors.textSub }]}>OPP</Text>
           <Text style={[s.catLabel, { width: 48, textAlign: "center", color: colors.textSub }]}>PROJ</Text>
           <Text style={[s.catLabel, { width: 52, textAlign: "center", color: colors.textSub }]}>SCORE</Text>
-          {editMode && <View style={{ width: 32 }} />}
+          {editMode && <View style={{ width: 26, marginLeft: 6 }} />}
         </View>
 
         {editMode && swap && (
@@ -585,7 +613,8 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             editMode={editMode}
             hasSelection={!!swap}
             isValidTarget={!!swap && swap.id !== r.id && !r.gameStarted && isValidSwap(swap, r)}
-            onPress={editMode && !r.gameStarted ? () => handlePress(r) : undefined} />
+            onPress={editMode && !r.gameStarted ? () => handlePress(r) : undefined}
+            onTap={!editMode ? () => setSelectedPlayer(r) : undefined} />
         ))}
         <Text style={[s.sectionTitle, { color: colors.textSub, marginTop: 20 }]}>Bench</Text>
         {bench.map((r, i) => (
@@ -595,9 +624,14 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             editMode={editMode}
             hasSelection={!!swap}
             isValidTarget={!!swap && swap.id !== r.id && !r.gameStarted && isValidSwap(swap, r)}
-            onPress={editMode && !r.gameStarted ? () => handlePress(r) : undefined} />
+            onPress={editMode && !r.gameStarted ? () => handlePress(r) : undefined}
+            onTap={!editMode ? () => setSelectedPlayer(r) : undefined} />
         ))}
       </View>
+
+      {selectedPlayer && (
+        <PlayerDetailSheet slot={selectedPlayer} onClose={() => setSelectedPlayer(null)} />
+      )}
 
       {/* ── Team Settings Modal ── */}
       <Modal visible={settingsOpen} transparent animationType="slide">
@@ -1001,8 +1035,8 @@ function SettingsTab({ league, onCopyInvite }: { league: LeagueDetail; onCopyInv
   );
 }
 
-function PlayerCard({ slot, selected, muted, onPress, showStats, isLast, editMode, hasSelection, isValidTarget }: {
-  slot: RosterSlot; selected?: boolean; muted?: boolean; showStats?: boolean; onPress?: () => void;
+function PlayerCard({ slot, selected, muted, onPress, onTap, showStats, isLast, editMode, hasSelection, isValidTarget }: {
+  slot: RosterSlot; selected?: boolean; muted?: boolean; showStats?: boolean; onPress?: () => void; onTap?: () => void;
   isLast?: boolean; editMode?: boolean; hasSelection?: boolean; isValidTarget?: boolean;
 }) {
   const { colors } = useTheme();
@@ -1072,8 +1106,96 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast, editMod
     </View>
   );
 
-  if (onPress) return <TouchableOpacity onPress={onPress} activeOpacity={0.6}>{inner}</TouchableOpacity>;
+  const handler = onPress ?? onTap;
+  if (handler) return <TouchableOpacity onPress={handler} activeOpacity={0.6}>{inner}</TouchableOpacity>;
   return inner;
+}
+
+function PlayerDetailSheet({ slot, onClose }: { slot: RosterSlot; onClose: () => void }) {
+  const { colors } = useTheme();
+  const [news, setNews] = useState<{ headline: string; description?: string }[]>([]);
+  const [loadingNews, setLoadingNews] = useState(true);
+  const [imgErr, setImgErr] = useState(false);
+
+  useEffect(() => {
+    setLoadingNews(true);
+    setNews([]);
+    async function fetchNews() {
+      try {
+        const res = await fetch("https://site.api.espn.com/apis/site/v2/sports/football/nfl/news?limit=20");
+        const data = await res.json();
+        const lastName = slot.name?.split(" ").slice(1).join(" ")?.toLowerCase() ?? "";
+        const filtered = (data.articles ?? [])
+          .filter((a: any) =>
+            lastName && (
+              (a.headline ?? "").toLowerCase().includes(lastName) ||
+              (a.description ?? "").toLowerCase().includes(lastName)
+            )
+          )
+          .slice(0, 5)
+          .map((a: any) => ({ headline: a.headline ?? "", description: a.description ?? "" }));
+        setNews(filtered);
+      } catch {}
+      setLoadingNews(false);
+    }
+    fetchNews();
+  }, [slot.name]);
+
+  const proj = slot.projected != null ? slot.projected : (MOCK_PROJ[slot.position ?? slot.slot] ?? 0);
+  const hasScore = (slot.points ?? 0) > 0;
+
+  return (
+    <Modal visible transparent animationType="slide">
+      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.6)" }}>
+        <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 44, maxHeight: "78%" }}>
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 20 }} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 20 }}>
+            {slot.headshotUrl && !imgErr ? (
+              <Image source={{ uri: slot.headshotUrl }} style={{ width: 56, height: 56, borderRadius: 28 }} onError={() => setImgErr(true)} />
+            ) : (
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ color: colors.textSub, fontSize: 18, fontWeight: "800" }}>{(slot.position ?? slot.slot).slice(0, 2)}</Text>
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text, fontSize: 19, fontWeight: "900", lineHeight: 22 }}>{slot.name ?? slot.playerId}</Text>
+              <Text style={{ color: colors.textSub, fontSize: 12, marginTop: 3 }}>
+                {[slot.position, slot.team, slot.opponent ? `· ${slot.opponent}` : null].filter(Boolean).join(" ")}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={22} color={colors.textSub} />
+            </TouchableOpacity>
+          </View>
+          <View style={{ flexDirection: "row", gap: 10, marginBottom: 22 }}>
+            {[
+              { label: "Projected", value: proj.toFixed(1), color: colors.accent },
+              { label: "Score", value: hasScore ? (slot.points ?? 0).toFixed(1) : "—", color: hasScore ? colors.text : colors.textSub },
+              { label: "Opponent", value: slot.opponent ?? "—", color: colors.text },
+            ].map((stat) => (
+              <View key={stat.label} style={{ flex: 1, backgroundColor: colors.bg, borderRadius: 10, padding: 12, alignItems: "center" }}>
+                <Text style={{ color: colors.textSub, fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>{stat.label}</Text>
+                <Text style={{ color: stat.color, fontSize: 18, fontWeight: "900", marginTop: 4 }}>{stat.value}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={{ color: colors.textSub, fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>Latest News</Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {loadingNews ? (
+              <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} />
+            ) : news.length === 0 ? (
+              <Text style={{ color: colors.textSub, fontSize: 13, textAlign: "center", marginTop: 8, paddingBottom: 8 }}>No recent news found.</Text>
+            ) : news.map((a, i) => (
+              <View key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottomWidth: i < news.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
+                <Text style={{ color: colors.text, fontSize: 13, fontWeight: "700", lineHeight: 18 }}>{a.headline}</Text>
+                {a.description ? <Text style={{ color: colors.textSub, fontSize: 11, marginTop: 4, lineHeight: 16 }} numberOfLines={3}>{a.description}</Text> : null}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 function InfoRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
@@ -1148,7 +1270,7 @@ const s = StyleSheet.create({
   swapHint: { fontSize: 12, textAlign: "center" },
 
   teamHero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
-  heroTopRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 14 },
+  heroTopRow: { flexDirection: "column", marginBottom: 14 },
   settingsBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7 },
   settingsBtnText: { fontSize: 12, fontWeight: "600" },
   heroEditBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
