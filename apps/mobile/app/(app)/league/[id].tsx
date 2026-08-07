@@ -26,7 +26,7 @@ interface LeagueDetail {
 }
 interface RosterSlot {
   id: string; playerId: string; slot: string; points: number | null;
-  projected?: number | null;
+  projected?: number | null; gameStarted?: boolean;
   name?: string; position?: string; team?: string | null;
   headshotUrl?: string; statLine?: string;
 }
@@ -344,7 +344,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         setRoster(teamRes.data.roster);
         setCurrentWeek(teamRes.data.currentWeek);
         setSelectedWeek(teamRes.data.currentWeek);
-        setIsLocked(teamRes.data.isLocked);
+        setIsLocked(false); // pre-game: current week always editable
         setTeamName(teamRes.data.team?.name ?? "");
         setTeamAbbr(teamRes.data.team?.abbreviation ?? "");
         if (standingsRes.ok) {
@@ -377,15 +377,16 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
     api.get<{ roster: RosterSlot[]; isLocked: boolean }>(`/season/${leagueId}/my-team?week=${selectedWeek}`).then((res) => {
       if (res.ok) {
         setRoster(res.data.roster);
-        setIsLocked(res.data.isLocked ?? selectedWeek < currentWeek);
+        setIsLocked(selectedWeek < currentWeek);
       }
     });
   }, [selectedWeek]);
 
   function handlePress(slot: RosterSlot) {
-    if (!editMode || isLocked) return;
+    if (!editMode || slot.gameStarted) return;
     if (!swap) { setSwap(slot); return; }
     if (swap.id === slot.id) { setSwap(null); return; }
+    if (swap.gameStarted) { setSwap(null); return; }
     setRoster((prev) => prev.map((r) => {
       if (r.id === swap.id) return { ...r, slot: slot.slot };
       if (r.id === slot.id) return { ...r, slot: swap.slot };
@@ -422,7 +423,8 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
   const MAX_WEEK = 18;
 
   return (
-    <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: 48 }}>
+    <View style={{ flex: 1 }}>
+    <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: 110 }}>
       {/* ── Team Hero ── */}
       <LinearGradient
         colors={["#C81A1A18", "#7520CC18", "#1834D418"]}
@@ -486,34 +488,10 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
           </View>
         )}
 
-        {/* Row 4: Edit Lineup button */}
-        {!isLocked && selectedWeek === currentWeek && (
-          <View style={s.editRow}>
-            {!editMode ? (
-              <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.accent }]} onPress={() => setEditMode(true)}>
-                <Ionicons name="create-outline" size={15} color="#fff" />
-                <Text style={s.editBtnText}>Edit Lineup</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={{ flexDirection: "row", gap: 8, flex: 1 }}>
-                <TouchableOpacity style={[s.editBtn, { backgroundColor: "#22c55e", flex: 1 }]} onPress={saveLineup} disabled={saving}>
-                  <Ionicons name="checkmark" size={15} color="#fff" />
-                  <Text style={s.editBtnText}>{saving ? "Saving…" : saved ? "Saved!" : "Save Lineup"}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.editBtn, { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border }]}
-                  onPress={() => { setEditMode(false); setSwap(null); }}
-                >
-                  <Text style={[s.editBtnText, { color: colors.textSub }]}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
         {isLocked && (
-          <View style={[s.lockedBanner, { backgroundColor: `${"#f59e0b"}18`, borderColor: "#f59e0b44" }]}>
+          <View style={[s.lockedBanner, { backgroundColor: "#f59e0b18", borderColor: "#f59e0b44" }]}>
             <Ionicons name="lock-closed" size={12} color="#f59e0b" />
-            <Text style={[s.lockedBannerText, { color: "#f59e0b" }]}>Lineup locked for this week</Text>
+            <Text style={[s.lockedBannerText, { color: "#f59e0b" }]}>Viewing past week — lineup locked</Text>
           </View>
         )}
       </LinearGradient>
@@ -522,20 +500,22 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
       <View style={{ padding: 16 }}>
         {editMode && swap && (
           <View style={[s.swapBanner, { backgroundColor: `${colors.accent}18`, borderColor: colors.accent }]}>
-            <Text style={[s.swapHint, { color: colors.accent }]}>Now tap a player to swap with {swap.name ?? swap.slot}</Text>
+            <Text style={[s.swapHint, { color: colors.accent }]}>Tap a player to swap with {swap.name ?? swap.slot}</Text>
           </View>
         )}
         {editMode && !swap && (
-          <Text style={[s.swapHint, { color: colors.textSub, marginBottom: 10, textAlign: "center" }]}>Tap a player to move them</Text>
+          <Text style={[s.swapHint, { color: colors.textSub, marginBottom: 10, textAlign: "center" }]}>Tap a player to move them · 🔒 = game started</Text>
         )}
 
         <Text style={[s.sectionTitle, { color: colors.textSub }]}>Starters · {pts.toFixed(1)} pts</Text>
         {starters.map((r, i) => (
-          <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} isLast={i === starters.length - 1} onPress={editMode ? () => handlePress(r) : undefined} />
+          <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} isLast={i === starters.length - 1}
+            onPress={editMode && !r.gameStarted ? () => handlePress(r) : undefined} />
         ))}
         <Text style={[s.sectionTitle, { color: colors.textSub, marginTop: 20 }]}>Bench</Text>
         {bench.map((r, i) => (
-          <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} isLast={i === bench.length - 1} onPress={editMode ? () => handlePress(r) : undefined} />
+          <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} isLast={i === bench.length - 1}
+            onPress={editMode && !r.gameStarted ? () => handlePress(r) : undefined} />
         ))}
       </View>
 
@@ -580,6 +560,41 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         </View>
       </Modal>
     </ScrollView>
+
+    {/* ── Floating Edit Bar ── */}
+    {!isLocked && selectedWeek === currentWeek && (
+      <View style={[s.floatingBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        {!editMode ? (
+          <TouchableOpacity
+            style={[s.floatingEditBtn, { backgroundColor: colors.accent }]}
+            onPress={() => setEditMode(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="create-outline" size={17} color="#fff" />
+            <Text style={s.floatingBtnText}>Edit Lineup</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ flexDirection: "row", gap: 10, flex: 1 }}>
+            <TouchableOpacity
+              style={[s.floatingEditBtn, { backgroundColor: "#22c55e" }]}
+              onPress={saveLineup}
+              disabled={saving}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark" size={17} color="#fff" />
+              <Text style={s.floatingBtnText}>{saving ? "Saving…" : "Save Lineup"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.floatingEditBtn, { flex: 0, paddingHorizontal: 22, backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border }]}
+              onPress={() => { setEditMode(false); setSwap(null); }}
+            >
+              <Text style={[s.floatingBtnText, { color: colors.textSub }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    )}
+    </View>
   );
 }
 
@@ -954,13 +969,20 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
       muted && s.playerRowMuted,
     ]}>
       <Text style={[s.slotLabel, { color: colors.accent }]}>{slot.slot}</Text>
-      {slot.headshotUrl && !imgErr ? (
-        <Image source={{ uri: slot.headshotUrl }} style={s.headshot} onError={() => setImgErr(true)} />
-      ) : (
-        <View style={[s.headshotFallback, { backgroundColor: colors.surface }]}>
-          <Text style={[s.headshotText, { color: colors.textSub }]}>{(slot.position ?? slot.slot).slice(0, 2)}</Text>
-        </View>
-      )}
+      <View>
+        {slot.headshotUrl && !imgErr ? (
+          <Image source={{ uri: slot.headshotUrl }} style={s.headshot} onError={() => setImgErr(true)} />
+        ) : (
+          <View style={[s.headshotFallback, { backgroundColor: colors.surface }]}>
+            <Text style={[s.headshotText, { color: colors.textSub }]}>{(slot.position ?? slot.slot).slice(0, 2)}</Text>
+          </View>
+        )}
+        {slot.gameStarted && (
+          <View style={s.lockBadge}>
+            <Ionicons name="lock-closed" size={8} color="#fff" />
+          </View>
+        )}
+      </View>
       <View style={s.playerInfo}>
         <Text style={[s.playerName, { color: colors.text }]} numberOfLines={1}>{slot.name ?? slot.playerId}</Text>
         {showStats && slot.statLine ? (
@@ -1108,6 +1130,10 @@ const s = StyleSheet.create({
   playerName: { fontSize: 13, fontWeight: "600" },
   playerMeta: { fontSize: 11, marginTop: 1 },
   pts: { fontSize: 14, fontWeight: "700" },
+  floatingBar: { position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32, borderTopWidth: 1, flexDirection: "row" },
+  floatingEditBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 15 },
+  floatingBtnText: { fontSize: 15, fontWeight: "700", color: "#fff" },
+  lockBadge: { position: "absolute", bottom: 0, right: 0, width: 15, height: 15, borderRadius: 8, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center" },
   projScoreCol: { alignItems: "flex-end", gap: 3 },
   projScoreRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   projLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3, width: 42, textAlign: "right" },
