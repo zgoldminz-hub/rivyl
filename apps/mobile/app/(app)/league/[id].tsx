@@ -956,9 +956,7 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
           <Text style={[s.headshotText, { color: colors.textSub }]}>{(slot.position ?? slot.slot).slice(0, 2)}</Text>
         </View>
       )}
-      <View style={[s.slotBadge, { backgroundColor: colors.border }]}>
-        <Text style={[s.slotText, { color: colors.text }]}>{slot.slot}</Text>
-      </View>
+      <Text style={[s.slotLabel, { color: colors.textSub }]}>{slot.slot}</Text>
       <View style={s.playerInfo}>
         <Text style={[s.playerName, { color: colors.text }]} numberOfLines={1}>{slot.name ?? slot.playerId}</Text>
         {showStats && slot.statLine ? (
@@ -1088,6 +1086,7 @@ const s = StyleSheet.create({
   headshotText: { fontSize: 11, fontWeight: "800" },
   slotBadge: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3, minWidth: 42, alignItems: "center" },
   slotText: { fontSize: 10, fontWeight: "700" },
+  slotLabel: { fontSize: 10, fontWeight: "700", minWidth: 36 },
   playerInfo: { flex: 1 },
   playerName: { fontSize: 13, fontWeight: "600" },
   playerMeta: { fontSize: 11, marginTop: 1 },
