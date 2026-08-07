@@ -378,6 +378,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
   const [savingSettings, setSavingSettings] = useState(false);
   const [oppMap, setOppMap] = useState<Record<string, string>>({});
   const [selectedPlayer, setSelectedPlayer] = useState<RosterSlot | null>(null);
+  const [weekDropdown, setWeekDropdown] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -555,7 +556,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
           </View>
         </View>
 
-        {/* Row 2: week selector */}
+        {/* Week selector */}
         <View style={s.weekRow}>
           <TouchableOpacity
             onPress={() => setSelectedWeek((w) => Math.max(1, w - 1))}
@@ -564,9 +565,12 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
           >
             <Ionicons name="chevron-back" size={18} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[s.weekLabel, { color: colors.text }]}>
-            Week {selectedWeek}{selectedWeek === currentWeek ? " · Current" : selectedWeek < currentWeek ? " · Past" : " · Upcoming"}
-          </Text>
+          <TouchableOpacity onPress={() => setWeekDropdown(true)} style={{ flexDirection: "row", alignItems: "center", gap: 6 }} activeOpacity={0.7}>
+            <Text style={[s.weekLabel, { color: colors.text }]}>
+              Week {selectedWeek}{selectedWeek === currentWeek ? " · Current" : selectedWeek < currentWeek ? " · Past" : " · Upcoming"}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color={colors.textSub} />
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setSelectedWeek((w) => Math.min(MAX_WEEK, w + 1))}
             disabled={selectedWeek >= MAX_WEEK}
@@ -695,6 +699,38 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
       {selectedPlayer && (
         <PlayerDetailSheet slot={selectedPlayer} leagueId={leagueId} currentWeek={currentWeek} onClose={() => setSelectedPlayer(null)} />
       )}
+
+      {/* ── Week Picker Modal ── */}
+      <Modal visible={weekDropdown} transparent animationType="fade">
+        <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", paddingHorizontal: 48 }} activeOpacity={1} onPress={() => setWeekDropdown(false)}>
+          <TouchableOpacity activeOpacity={1}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: 16, overflow: "hidden", maxHeight: 420 }}>
+              <View style={{ paddingHorizontal: 18, paddingTop: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <Text style={{ color: colors.text, fontSize: 15, fontWeight: "800" }}>Select Week</Text>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {Array.from({ length: MAX_WEEK }, (_, i) => i + 1).map((w) => {
+                  const isSelected = w === selectedWeek;
+                  const label = w === currentWeek ? "Current" : w < currentWeek ? "Past" : "Upcoming";
+                  return (
+                    <TouchableOpacity
+                      key={w}
+                      onPress={() => { setSelectedWeek(w); setWeekDropdown(false); }}
+                      style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 18, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: `${colors.border}66`, backgroundColor: isSelected ? `${colors.accent}14` : "transparent" }}
+                    >
+                      <Text style={{ flex: 1, color: isSelected ? colors.accent : colors.text, fontWeight: isSelected ? "700" : "500", fontSize: 14 }}>
+                        Week {w}
+                      </Text>
+                      <Text style={{ color: isSelected ? colors.accent : colors.textSub, fontSize: 12, fontWeight: "600" }}>{label}</Text>
+                      {isSelected && <Ionicons name="checkmark" size={15} color={colors.accent} style={{ marginLeft: 10 }} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* ── Team Settings Modal ── */}
       <Modal visible={settingsOpen} transparent animationType="slide">
@@ -1482,13 +1518,13 @@ const s = StyleSheet.create({
   swapBanner: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 12 },
   swapHint: { fontSize: 12, textAlign: "center" },
 
-  teamHero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
+  teamHero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, borderBottomWidth: 1 },
   heroTopRow: { flexDirection: "column", marginBottom: 14 },
   settingsBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7 },
   settingsBtnText: { fontSize: 12, fontWeight: "600" },
   heroEditBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   heroEditBtnText: { fontSize: 12, fontWeight: "700", color: "#fff" },
-  weekRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 14, gap: 12 },
+  weekRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 8, gap: 12 },
   weekArrow: { padding: 4 },
   matchupMini: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
   matchupMiniHalf: { flex: 1 },
