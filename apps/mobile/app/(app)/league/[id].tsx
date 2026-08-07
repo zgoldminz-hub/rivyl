@@ -945,7 +945,7 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
   const inner = (
     <View style={[
       s.playerRow,
-      !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.accent },
+      !isLast && { borderBottomWidth: 1, borderBottomColor: `${colors.accent}28` },
       selected && { backgroundColor: `${colors.accent}14` },
       muted && s.playerRowMuted,
     ]}>
@@ -1079,7 +1079,7 @@ const s = StyleSheet.create({
   divider: { height: 1, marginVertical: 20 },
 
   rosterSection: { borderWidth: 1, borderRadius: 12, overflow: "hidden", marginBottom: 6 },
-  playerRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 4 },
+  playerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 4 },
   playerRowMuted: { opacity: 0.4 },
   headshot: { width: 38, height: 38, borderRadius: 19 },
   headshotFallback: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
