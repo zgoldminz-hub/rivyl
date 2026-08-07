@@ -391,6 +391,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
   const [team, setTeam] = useState<{ id: string; name: string; abbreviation?: string; avatarId?: string; ownerName?: string; photoUri?: string | null } | null>(null);
   const [pendingLogoId, setPendingLogoId] = useState<string>(TEAM_LOGOS[0].id);
   const [pendingPhotoUri, setPendingPhotoUri] = useState<string | null>(null);
+  const [moderating, setModerating] = useState(false);
   const [record, setRecord] = useState<{ wins: number; losses: number } | null>(null);
   const [roster, setRoster] = useState<RosterSlot[]>([]);
   const [currentWeek, setCurrentWeek] = useState(1);
@@ -546,10 +547,24 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
+      base64: true,
+      presentationStyle: ImagePicker.UIImagePickerPresentationStyle.OVER_FULL_SCREEN,
     });
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      setPendingPhotoUri(result.assets[0].uri);
+    if (result.canceled || !result.assets?.[0]) return;
+    const { uri, base64 } = result.assets[0];
+    if (base64) {
+      setModerating(true);
+      try {
+        const modRes = await api.post(`/team/moderate-image`, { imageBase64: base64 });
+        if (modRes.ok && (modRes as any).data?.flagged) {
+          Alert.alert("Image Not Allowed", "This photo was detected as inappropriate and can't be used as a team avatar.");
+          setModerating(false);
+          return;
+        }
+      } catch {}
+      setModerating(false);
     }
+    setPendingPhotoUri(uri);
   }
 
   async function saveTeamSettings() {
@@ -818,13 +833,17 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             {/* Camera roll button */}
             <TouchableOpacity
               onPress={pickFromCameraRoll}
+              disabled={moderating}
               activeOpacity={0.8}
-              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginBottom: 4 }}
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginBottom: 10, opacity: moderating ? 0.6 : 1 }}
             >
-              <Ionicons name="image-outline" size={18} color={colors.text} />
-              <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>Upload from Photos</Text>
+              {moderating
+                ? <ActivityIndicator size="small" color={colors.text} />
+                : <Ionicons name="image-outline" size={18} color={colors.text} />}
+              <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>
+                {moderating ? "Checking image…" : "Upload from Photos"}
+              </Text>
             </TouchableOpacity>
-            <Text style={{ color: colors.textSub, fontSize: 10, textAlign: "center", marginBottom: 10 }}>No offensive or inappropriate content</Text>
 
             {pendingPhotoUri && (
               <TouchableOpacity
