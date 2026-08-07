@@ -26,6 +26,7 @@ interface LeagueDetail {
 }
 interface RosterSlot {
   id: string; playerId: string; slot: string; points: number | null;
+  projected?: number | null;
   name?: string; position?: string; team?: string | null;
   headshotUrl?: string; statLine?: string;
 }
@@ -965,9 +966,20 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
           <Text style={[s.playerMeta, { color: colors.textSub }]}>{slot.position}{slot.team ? ` · ${slot.team}` : ""}</Text>
         ) : null}
       </View>
-      <Text style={[s.pts, (slot.points ?? 0) > 0 ? { color: colors.text } : { color: colors.textSub }]}>
-        {slot.points !== null && slot.points !== undefined ? slot.points.toFixed(1) : "—"}
-      </Text>
+      <View style={s.projScoreCol}>
+        <View style={s.projScoreRow}>
+          <Text style={[s.projLabel, { color: colors.textSub }]}>PROJ</Text>
+          <Text style={[s.projValue, { color: colors.textSub }]}>
+            {slot.projected != null ? slot.projected.toFixed(1) : "—"}
+          </Text>
+        </View>
+        <View style={s.projScoreRow}>
+          <Text style={[s.projLabel, { color: colors.textSub }]}>SCORE</Text>
+          <Text style={[s.projValue, { color: (slot.points ?? 0) > 0 ? colors.text : colors.textSub }]}>
+            {slot.points != null ? slot.points.toFixed(1) : "—"}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 
@@ -1091,6 +1103,10 @@ const s = StyleSheet.create({
   playerName: { fontSize: 13, fontWeight: "600" },
   playerMeta: { fontSize: 11, marginTop: 1 },
   pts: { fontSize: 14, fontWeight: "700" },
+  projScoreCol: { alignItems: "flex-end", gap: 3 },
+  projScoreRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  projLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4, width: 34, textAlign: "right" },
+  projValue: { fontSize: 13, fontWeight: "700", width: 34, textAlign: "right" },
 
   subTabRow: { flexDirection: "row", borderBottomWidth: 1 },
   subTab: { flex: 1, paddingVertical: 11, alignItems: "center" },
