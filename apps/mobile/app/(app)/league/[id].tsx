@@ -526,13 +526,17 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         )}
 
         <Text style={[s.sectionTitle, { color: colors.textSub }]}>Starters · {pts.toFixed(1)} pts</Text>
-        {starters.map((r) => (
-          <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} onPress={editMode ? () => handlePress(r) : undefined} />
-        ))}
+        <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {starters.map((r, i) => (
+            <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} isLast={i === starters.length - 1} onPress={editMode ? () => handlePress(r) : undefined} />
+          ))}
+        </View>
         <Text style={[s.sectionTitle, { color: colors.textSub, marginTop: 20 }]}>Bench</Text>
-        {bench.map((r) => (
-          <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} onPress={editMode ? () => handlePress(r) : undefined} />
-        ))}
+        <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {bench.map((r, i) => (
+            <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} isLast={i === bench.length - 1} onPress={editMode ? () => handlePress(r) : undefined} />
+          ))}
+        </View>
       </View>
 
       {/* ── Team Settings Modal ── */}
@@ -637,14 +641,22 @@ function MatchupTab({ leagueId }: { leagueId: string }) {
       </LinearGradient>
 
       <Text style={[s.rosterLabel, { color: colors.textSub }]}>{matchup.homeTeam.name}</Text>
-      {sortSlots(matchup.homeTeam.rosterSlots).map((sl) => <PlayerCard key={sl.id} slot={sl} showStats />)}
+      <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {sortSlots(matchup.homeTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} showStats isLast={i === arr.length - 1} />)}
+      </View>
       <Text style={[s.rosterLabel, { color: colors.textSub, opacity: 0.5, marginTop: 4 }]}>Bench</Text>
-      {benchSlots(matchup.homeTeam.rosterSlots).map((sl) => <PlayerCard key={sl.id} slot={sl} muted showStats />)}
+      <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {benchSlots(matchup.homeTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} muted showStats isLast={i === arr.length - 1} />)}
+      </View>
       <View style={[s.divider, { backgroundColor: colors.border }]} />
       <Text style={[s.rosterLabel, { color: colors.textSub }]}>{matchup.awayTeam.name}</Text>
-      {sortSlots(matchup.awayTeam.rosterSlots).map((sl) => <PlayerCard key={sl.id} slot={sl} showStats />)}
+      <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {sortSlots(matchup.awayTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} showStats isLast={i === arr.length - 1} />)}
+      </View>
       <Text style={[s.rosterLabel, { color: colors.textSub, opacity: 0.5, marginTop: 4 }]}>Bench</Text>
-      {benchSlots(matchup.awayTeam.rosterSlots).map((sl) => <PlayerCard key={sl.id} slot={sl} muted showStats />)}
+      <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {benchSlots(matchup.awayTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} muted showStats isLast={i === arr.length - 1} />)}
+      </View>
     </ScrollView>
   );
 }
@@ -742,25 +754,30 @@ function WaiversTab({ leagueId }: { leagueId: string }) {
             </ScrollView>
           </View>
           <ScrollView contentContainerStyle={s.content}>
-            {players.map((pl) => (
-              <View key={pl.player_id} style={[s.playerRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={[s.headshotFallback, { backgroundColor: `${POS_COLORS[pl.position] ?? "#6b7280"}22` }]}>
-                  <Text style={[s.headshotText, { color: POS_COLORS[pl.position] ?? "#6b7280" }]}>{pl.position?.slice(0, 2)}</Text>
+            <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {players.map((pl, i) => (
+                <View key={pl.player_id} style={[
+                  s.playerRow,
+                  i < players.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                ]}>
+                  <View style={[s.headshotFallback, { backgroundColor: `${POS_COLORS[pl.position] ?? "#6b7280"}22` }]}>
+                    <Text style={[s.headshotText, { color: POS_COLORS[pl.position] ?? "#6b7280" }]}>{pl.position?.slice(0, 2)}</Text>
+                  </View>
+                  <View style={[s.slotBadge, { backgroundColor: POS_COLORS[pl.position] ?? "#6b7280" }]}>
+                    <Text style={s.slotText}>{pl.position}</Text>
+                  </View>
+                  <View style={s.playerInfo}>
+                    <Text style={[s.playerName, { color: colors.text }]}>{pl.full_name}</Text>
+                    <Text style={[s.playerMeta, { color: colors.textSub }]}>
+                      {pl.team ?? "FA"}{pl.injury_status ? ` · ${pl.injury_status}` : ""}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={[s.claimBtn, { backgroundColor: colors.accent }]} onPress={() => setClaimTarget(pl)}>
+                    <Text style={s.claimBtnText}>Add</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={[s.slotBadge, { backgroundColor: POS_COLORS[pl.position] ?? "#6b7280" }]}>
-                  <Text style={s.slotText}>{pl.position}</Text>
-                </View>
-                <View style={s.playerInfo}>
-                  <Text style={[s.playerName, { color: colors.text }]}>{pl.full_name}</Text>
-                  <Text style={[s.playerMeta, { color: colors.textSub }]}>
-                    {pl.team ?? "FA"}{pl.injury_status ? ` · ${pl.injury_status}` : ""}
-                  </Text>
-                </View>
-                <TouchableOpacity style={[s.claimBtn, { backgroundColor: colors.accent }]} onPress={() => setClaimTarget(pl)}>
-                  <Text style={s.claimBtnText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+              ))}
+            </View>
           </ScrollView>
         </View>
       ) : (
@@ -933,8 +950,8 @@ function SettingsTab({ league, onCopyInvite }: { league: LeagueDetail; onCopyInv
   );
 }
 
-function PlayerCard({ slot, selected, muted, onPress, showStats }: {
-  slot: RosterSlot; selected?: boolean; muted?: boolean; showStats?: boolean; onPress?: () => void;
+function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
+  slot: RosterSlot; selected?: boolean; muted?: boolean; showStats?: boolean; onPress?: () => void; isLast?: boolean;
 }) {
   const { colors } = useTheme();
   const [imgErr, setImgErr] = useState(false);
@@ -943,8 +960,8 @@ function PlayerCard({ slot, selected, muted, onPress, showStats }: {
   const inner = (
     <View style={[
       s.playerRow,
-      { backgroundColor: colors.surface, borderColor: colors.border },
-      selected && { borderColor: colors.accent, backgroundColor: `${colors.accent}12` },
+      !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+      selected && { backgroundColor: `${colors.accent}10` },
       muted && s.playerRowMuted,
     ]}>
       {slot.headshotUrl && !imgErr ? (
@@ -971,7 +988,7 @@ function PlayerCard({ slot, selected, muted, onPress, showStats }: {
     </View>
   );
 
-  if (onPress) return <TouchableOpacity onPress={onPress} activeOpacity={0.75}>{inner}</TouchableOpacity>;
+  if (onPress) return <TouchableOpacity onPress={onPress} activeOpacity={0.6}>{inner}</TouchableOpacity>;
   return inner;
 }
 
@@ -1078,8 +1095,9 @@ const s = StyleSheet.create({
   rosterLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 8 },
   divider: { height: 1, marginVertical: 20 },
 
-  playerRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderWidth: 1, borderRadius: 10, marginBottom: 6 },
-  playerRowMuted: { opacity: 0.45 },
+  rosterSection: { borderWidth: 1, borderRadius: 12, overflow: "hidden", marginBottom: 6 },
+  playerRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11 },
+  playerRowMuted: { opacity: 0.4 },
   headshot: { width: 38, height: 38, borderRadius: 19 },
   headshotFallback: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   headshotText: { fontSize: 11, fontWeight: "800" },
