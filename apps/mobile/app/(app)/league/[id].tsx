@@ -630,7 +630,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
       </View>
 
       {selectedPlayer && (
-        <PlayerDetailSheet slot={selectedPlayer} onClose={() => setSelectedPlayer(null)} />
+        <PlayerDetailSheet slot={selectedPlayer} leagueId={leagueId} currentWeek={currentWeek} onClose={() => setSelectedPlayer(null)} />
       )}
 
       {/* ── Team Settings Modal ── */}
@@ -1111,12 +1111,18 @@ function PlayerCard({ slot, selected, muted, onPress, onTap, showStats, isLast, 
   return inner;
 }
 
-function PlayerDetailSheet({ slot, onClose }: { slot: RosterSlot; onClose: () => void }) {
+function PlayerDetailSheet({ slot, leagueId, currentWeek, onClose }: {
+  slot: RosterSlot; leagueId: string; currentWeek: number; onClose: () => void;
+}) {
   const { colors } = useTheme();
+  const [detailTab, setDetailTab] = useState<"news" | "schedule">("news");
   const [news, setNews] = useState<{ headline: string; description?: string }[]>([]);
   const [loadingNews, setLoadingNews] = useState(true);
+  const [schedule, setSchedule] = useState<{ week: number; opponent: string; score: number | null; bye: boolean }[]>([]);
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [imgErr, setImgErr] = useState(false);
 
+  // News — live ESPN, fetches fresh every open, updates within minutes of player news breaking
   useEffect(() => {
     setLoadingNews(true);
     setNews([]);
@@ -1141,14 +1147,80 @@ function PlayerDetailSheet({ slot, onClose }: { slot: RosterSlot; onClose: () =>
     fetchNews();
   }, [slot.name]);
 
+  // Schedule — ESPN team schedule (2 API calls) + backend scores for past weeks
+  useEffect(() => {
+    if (!slot.team) { setLoadingSchedule(false); return; }
+    setLoadingSchedule(true);
+    async function buildSchedule() {
+      try {
+        const teamsRes = await fetch("https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams?limit=32");
+        const teamsData = await teamsRes.json();
+        const espnTeam = (teamsData.sports?.[0]?.leagues?.[0]?.teams ?? [])
+          .find((t: any) => t.team.abbreviation === slot.team);
+        if (!espnTeam) throw new Error("not found");
+
+        const schedRes = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${espnTeam.team.id}/schedule?season=2025&seasontype=2`
+        );
+        const schedData = await schedRes.json();
+
+        const weeks: { week: number; opponent: string; bye: boolean; score: number | null }[] = [];
+        for (const event of (schedData.events ?? [])) {
+          const weekNum = event.week?.number;
+          if (!weekNum) continue;
+          const comp = event.competitions?.[0];
+          const home = comp?.competitors?.find((c: any) => c.homeAway === "home");
+          const away = comp?.competitors?.find((c: any) => c.homeAway === "away");
+          if (!home || !away) continue;
+          const isHome = home.team.abbreviation === slot.team;
+          weeks.push({
+            week: weekNum,
+            opponent: isHome ? `vs ${away.team.abbreviation}` : `@${home.team.abbreviation}`,
+            bye: false,
+            score: null,
+          });
+        }
+        const covered = new Set(weeks.map(w => w.week));
+        for (let w = 1; w <= 18; w++) {
+          if (!covered.has(w)) weeks.push({ week: w, opponent: "BYE", bye: true, score: null });
+        }
+        weeks.sort((a, b) => a.week - b.week);
+
+        // Fetch this player's fantasy score for each past week in parallel
+        const scoreMap: Record<number, number | null> = {};
+        await Promise.all(
+          weeks
+            .filter(w => w.week <= currentWeek && !w.bye)
+            .map(async ({ week }) => {
+              try {
+                const res = await api.get<{ roster: RosterSlot[] }>(`/season/${leagueId}/my-team?week=${week}`);
+                if (res.ok) {
+                  const found = res.data.roster.find(r => r.playerId === slot.playerId);
+                  scoreMap[week] = found?.points ?? null;
+                }
+              } catch {}
+            })
+        );
+
+        setSchedule(weeks.map(w => ({ ...w, score: scoreMap[w.week] ?? null })));
+      } catch {
+        setSchedule([]);
+      }
+      setLoadingSchedule(false);
+    }
+    buildSchedule();
+  }, [slot.team, slot.playerId]);
+
   const proj = slot.projected != null ? slot.projected : (MOCK_PROJ[slot.position ?? slot.slot] ?? 0);
   const hasScore = (slot.points ?? 0) > 0;
 
   return (
     <Modal visible transparent animationType="slide">
       <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.6)" }}>
-        <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 44, maxHeight: "78%" }}>
+        <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 44, maxHeight: "82%" }}>
           <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 20 }} />
+
+          {/* Player header */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 20 }}>
             {slot.headshotUrl && !imgErr ? (
               <Image source={{ uri: slot.headshotUrl }} style={{ width: 56, height: 56, borderRadius: 28 }} onError={() => setImgErr(true)} />
@@ -1167,7 +1239,9 @@ function PlayerDetailSheet({ slot, onClose }: { slot: RosterSlot; onClose: () =>
               <Ionicons name="close" size={22} color={colors.textSub} />
             </TouchableOpacity>
           </View>
-          <View style={{ flexDirection: "row", gap: 10, marginBottom: 22 }}>
+
+          {/* Stats row */}
+          <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
             {[
               { label: "Projected", value: proj.toFixed(1), color: colors.accent },
               { label: "Score", value: hasScore ? (slot.points ?? 0).toFixed(1) : "—", color: hasScore ? colors.text : colors.textSub },
@@ -1179,18 +1253,62 @@ function PlayerDetailSheet({ slot, onClose }: { slot: RosterSlot; onClose: () =>
               </View>
             ))}
           </View>
-          <Text style={{ color: colors.textSub, fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>Latest News</Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {loadingNews ? (
-              <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} />
-            ) : news.length === 0 ? (
-              <Text style={{ color: colors.textSub, fontSize: 13, textAlign: "center", marginTop: 8, paddingBottom: 8 }}>No recent news found.</Text>
-            ) : news.map((a, i) => (
-              <View key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottomWidth: i < news.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
-                <Text style={{ color: colors.text, fontSize: 13, fontWeight: "700", lineHeight: 18 }}>{a.headline}</Text>
-                {a.description ? <Text style={{ color: colors.textSub, fontSize: 11, marginTop: 4, lineHeight: 16 }} numberOfLines={3}>{a.description}</Text> : null}
-              </View>
+
+          {/* Tab toggle */}
+          <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 16 }}>
+            {(["news", "schedule"] as const).map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => setDetailTab(tab)}
+                style={{ flex: 1, paddingVertical: 10, alignItems: "center", borderBottomWidth: detailTab === tab ? 2 : 0, borderBottomColor: colors.accent, marginBottom: -1 }}
+              >
+                <Text style={{ color: detailTab === tab ? colors.text : colors.textSub, fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  {tab}
+                </Text>
+              </TouchableOpacity>
             ))}
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {detailTab === "news" && (
+              loadingNews ? (
+                <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} />
+              ) : news.length === 0 ? (
+                <Text style={{ color: colors.textSub, fontSize: 13, textAlign: "center", marginTop: 8, paddingBottom: 8 }}>No recent news found.</Text>
+              ) : news.map((a, i) => (
+                <View key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottomWidth: i < news.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
+                  <Text style={{ color: colors.text, fontSize: 13, fontWeight: "700", lineHeight: 18 }}>{a.headline}</Text>
+                  {a.description ? <Text style={{ color: colors.textSub, fontSize: 11, marginTop: 4, lineHeight: 16 }} numberOfLines={3}>{a.description}</Text> : null}
+                </View>
+              ))
+            )}
+
+            {detailTab === "schedule" && (
+              loadingSchedule ? (
+                <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} />
+              ) : schedule.length === 0 ? (
+                <Text style={{ color: colors.textSub, fontSize: 13, textAlign: "center", marginTop: 8 }}>Schedule unavailable.</Text>
+              ) : (
+                <>
+                  <View style={{ flexDirection: "row", paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 4 }}>
+                    <Text style={{ width: 36, color: colors.textSub, fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>WK</Text>
+                    <Text style={{ flex: 1, color: colors.textSub, fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>OPPONENT</Text>
+                    <Text style={{ width: 56, textAlign: "right", color: colors.textSub, fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>SCORE</Text>
+                  </View>
+                  {schedule.map((row) => (
+                    <View key={row.week} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: `${colors.border}55` }}>
+                      <Text style={{ width: 36, color: row.week === currentWeek ? colors.accent : colors.textSub, fontSize: 12, fontWeight: row.week === currentWeek ? "800" : "600" }}>{row.week}</Text>
+                      <Text style={{ flex: 1, color: row.bye ? colors.textSub : colors.text, fontSize: 13, fontWeight: row.bye ? "400" : "600", fontStyle: row.bye ? "italic" : "normal" }}>
+                        {row.opponent}
+                      </Text>
+                      <Text style={{ width: 56, textAlign: "right", color: row.score != null && row.score > 0 ? colors.text : colors.textSub, fontSize: 13, fontWeight: "700" }}>
+                        {row.score != null && row.score > 0 ? row.score.toFixed(1) : row.week < currentWeek && !row.bye ? "—" : ""}
+                      </Text>
+                    </View>
+                  ))}
+                </>
+              )
+            )}
           </ScrollView>
         </View>
       </View>
