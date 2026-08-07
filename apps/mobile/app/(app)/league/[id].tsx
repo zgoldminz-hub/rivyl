@@ -747,11 +747,11 @@ function WaiversTab({ leagueId }: { leagueId: string }) {
                 s.playerRow,
                 i < players.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
               ]}>
-                <View style={[s.headshotFallback, { backgroundColor: `${POS_COLORS[pl.position] ?? "#6b7280"}22` }]}>
-                  <Text style={[s.headshotText, { color: POS_COLORS[pl.position] ?? "#6b7280" }]}>{pl.position?.slice(0, 2)}</Text>
+                <View style={[s.headshotFallback, { backgroundColor: colors.surface }]}>
+                  <Text style={[s.headshotText, { color: colors.textSub }]}>{pl.position?.slice(0, 2)}</Text>
                 </View>
-                <View style={[s.slotBadge, { backgroundColor: POS_COLORS[pl.position] ?? "#6b7280" }]}>
-                  <Text style={s.slotText}>{pl.position}</Text>
+                <View style={[s.slotBadge, { backgroundColor: colors.border }]}>
+                  <Text style={[s.slotText, { color: colors.text }]}>{pl.position}</Text>
                 </View>
                 <View style={s.playerInfo}>
                   <Text style={[s.playerName, { color: colors.text }]}>{pl.full_name}</Text>
@@ -941,7 +941,6 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
 }) {
   const { colors } = useTheme();
   const [imgErr, setImgErr] = useState(false);
-  const color = POS_COLORS[slot.slot] ?? "#6b7280";
 
   const inner = (
     <View style={[
@@ -953,12 +952,12 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
       {slot.headshotUrl && !imgErr ? (
         <Image source={{ uri: slot.headshotUrl }} style={s.headshot} onError={() => setImgErr(true)} />
       ) : (
-        <View style={[s.headshotFallback, { backgroundColor: `${color}22` }]}>
-          <Text style={[s.headshotText, { color }]}>{(slot.position ?? slot.slot).slice(0, 2)}</Text>
+        <View style={[s.headshotFallback, { backgroundColor: colors.surface }]}>
+          <Text style={[s.headshotText, { color: colors.textSub }]}>{(slot.position ?? slot.slot).slice(0, 2)}</Text>
         </View>
       )}
-      <View style={[s.slotBadge, { backgroundColor: color }]}>
-        <Text style={s.slotText}>{slot.slot}</Text>
+      <View style={[s.slotBadge, { backgroundColor: colors.border }]}>
+        <Text style={[s.slotText, { color: colors.text }]}>{slot.slot}</Text>
       </View>
       <View style={s.playerInfo}>
         <Text style={[s.playerName, { color: colors.text }]} numberOfLines={1}>{slot.name ?? slot.playerId}</Text>
@@ -1088,7 +1087,7 @@ const s = StyleSheet.create({
   headshotFallback: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   headshotText: { fontSize: 11, fontWeight: "800" },
   slotBadge: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3, minWidth: 42, alignItems: "center" },
-  slotText: { fontSize: 10, fontWeight: "700", color: "#fff" },
+  slotText: { fontSize: 10, fontWeight: "700" },
   playerInfo: { flex: 1 },
   playerName: { fontSize: 13, fontWeight: "600" },
   playerMeta: { fontSize: 11, marginTop: 1 },
