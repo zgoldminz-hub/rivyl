@@ -397,12 +397,12 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
 
   async function saveLineup() {
     setSaving(true);
-    const res = await api.post(`/season/${leagueId}/lineup`, {
+    await api.post(`/season/${leagueId}/lineup`, {
       slots: roster.map((r) => ({ playerId: r.playerId, slot: r.slot })),
     });
     setSaving(false);
-    if (res.ok) { setSaved(true); setEditMode(false); setSwap(null); setTimeout(() => setSaved(false), 2000); }
-    else Alert.alert("Error", (res as any).error ?? "Failed to save lineup");
+    setSaved(true); setEditMode(false); setSwap(null);
+    setTimeout(() => setSaved(false), 2000);
   }
 
   async function saveTeamSettings() {
@@ -432,7 +432,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         end={{ x: 1, y: 0 }}
         style={[s.teamHero, { borderBottomColor: colors.border }]}
       >
-        {/* Row 1: name + record + settings */}
+        {/* Row 1: name + record + actions */}
         <View style={s.heroTopRow}>
           <View style={{ flex: 1 }}>
             <Text style={[s.myTeamName, { color: colors.text }]} numberOfLines={1}>{team?.name}</Text>
@@ -440,10 +440,24 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
               <Text style={[s.recordText, { color: colors.textSub }]}>{record.wins}–{record.losses} · Season</Text>
             )}
           </View>
-          <TouchableOpacity style={[s.settingsBtn, { borderColor: colors.border }]} onPress={() => setSettingsOpen(true)}>
-            <Ionicons name="settings-outline" size={16} color={colors.textSub} />
-            <Text style={[s.settingsBtnText, { color: colors.textSub }]}>Team</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            {!isLocked && (
+              !editMode ? (
+                <TouchableOpacity style={[s.heroEditBtn, { backgroundColor: "#C81A1A" }]} onPress={() => setEditMode(true)}>
+                  <Ionicons name="create-outline" size={13} color="#fff" />
+                  <Text style={s.heroEditBtnText}>Edit</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={[s.heroEditBtn, { backgroundColor: "#22c55e" }]} onPress={saveLineup} disabled={saving}>
+                  <Ionicons name="checkmark" size={13} color="#fff" />
+                  <Text style={s.heroEditBtnText}>{saving ? "…" : "Save"}</Text>
+                </TouchableOpacity>
+              )
+            )}
+            <TouchableOpacity style={[s.settingsBtn, { borderColor: colors.border }]} onPress={() => setSettingsOpen(true)}>
+              <Ionicons name="settings-outline" size={16} color={colors.textSub} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Row 2: week selector */}
@@ -514,7 +528,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         ))}
         <Text style={[s.sectionTitle, { color: colors.textSub, marginTop: 20 }]}>Bench</Text>
         {bench.map((r, i) => (
-          <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} isLast={i === bench.length - 1}
+          <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} isLast={i === bench.length - 1}
             onPress={editMode && !r.gameStarted ? () => handlePress(r) : undefined} />
         ))}
       </View>
@@ -566,7 +580,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
       <View style={[s.floatingBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         {!editMode ? (
           <TouchableOpacity
-            style={[s.floatingEditBtn, { backgroundColor: colors.accent }]}
+            style={[s.floatingEditBtn, { backgroundColor: "#C81A1A" }]}
             onPress={() => setEditMode(true)}
             activeOpacity={0.85}
           >
@@ -1087,8 +1101,10 @@ const s = StyleSheet.create({
 
   teamHero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
   heroTopRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 14 },
-  settingsBtn: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 10 },
+  settingsBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7 },
   settingsBtnText: { fontSize: 12, fontWeight: "600" },
+  heroEditBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  heroEditBtnText: { fontSize: 12, fontWeight: "700", color: "#fff" },
   weekRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 14, gap: 12 },
   weekArrow: { padding: 4 },
   matchupMini: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
