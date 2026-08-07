@@ -945,7 +945,7 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
   const inner = (
     <View style={[
       s.playerRow,
-      !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+      !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.accent },
       selected && { backgroundColor: `${colors.accent}14` },
       muted && s.playerRowMuted,
     ]}>
