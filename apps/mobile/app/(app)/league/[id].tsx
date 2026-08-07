@@ -541,7 +541,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={[s.myTeamName, { color: colors.text, flex: 1 }]} numberOfLines={1}>{team?.name}</Text>
+              <Text style={[s.myTeamName, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{team?.name}</Text>
               <TouchableOpacity onPress={openSettings} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name="settings-outline" size={16} color={colors.textSub} />
               </TouchableOpacity>
@@ -612,41 +612,43 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             <Text style={[s.swapHint, { color: colors.accent }]}>Tap a player to swap with {swap.name ?? swap.slot}</Text>
           </View>
         )}
-        {/* Edit mode save/cancel bar */}
-        {!isLocked && editMode && (
-          <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
-            <TouchableOpacity
-              style={[s.lineupEditBar, { backgroundColor: "#22c55e", flex: 1, marginBottom: 0 }]}
-              onPress={saveLineup}
-              disabled={saving}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="checkmark" size={14} color="#fff" />
-              <Text style={s.lineupEditBarText}>{saving ? "Saving…" : "Save Lineup"}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.lineupEditBar, { flex: 0, paddingHorizontal: 16, backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}
-              onPress={() => { setEditMode(false); setSwap(null); }}
-            >
-              <Text style={[s.lineupEditBarText, { color: colors.textSub }]}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Set Lineup / Save-Cancel row */}
+        {!isLocked && (
+          !editMode ? (
+            <View style={{ marginBottom: 10 }}>
+              <TouchableOpacity
+                style={[s.lineupEditBar, { backgroundColor: "#C81A1A", alignSelf: "flex-start", paddingHorizontal: 18, marginBottom: 0 }]}
+                onPress={() => setEditMode(true)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="create-outline" size={14} color="#fff" />
+                <Text style={s.lineupEditBarText}>Set Lineup</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+              <TouchableOpacity
+                style={[s.lineupEditBar, { backgroundColor: "#22c55e", flex: 1, marginBottom: 0 }]}
+                onPress={saveLineup}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="checkmark" size={14} color="#fff" />
+                <Text style={s.lineupEditBarText}>{saving ? "Saving…" : "Save Lineup"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.lineupEditBar, { flex: 0, paddingHorizontal: 16, backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}
+                onPress={() => { setEditMode(false); setSwap(null); }}
+              >
+                <Text style={[s.lineupEditBarText, { color: colors.textSub }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )
         )}
 
-        {/* Combined header: Set Lineup left · totals stacked above PROJ/SCORE columns */}
-        <View style={[s.categoryRow, { borderBottomColor: colors.border, gap: 12, paddingBottom: 6, paddingTop: 4 }]}>
-          {!isLocked && !editMode ? (
-            <TouchableOpacity
-              style={[s.lineupEditBar, { backgroundColor: "#C81A1A", marginBottom: 0, paddingHorizontal: 14, paddingVertical: 7, flex: 0 }]}
-              onPress={() => setEditMode(true)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="create-outline" size={13} color="#fff" />
-              <Text style={[s.lineupEditBarText, { fontSize: 12 }]}>Set Lineup</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 32 }} />
-          )}
+        {/* Category header — gap: 12 mirrors playerRow. Totals sit above PROJ/SCORE labels. */}
+        <View style={[s.categoryRow, { borderBottomColor: colors.border, gap: 12 }]}>
+          <Text style={[s.catLabel, { width: 32, textAlign: "center", color: colors.textSub }]}>POS</Text>
           <View style={{ width: 38 }} />
           <Text style={[s.catLabel, { flex: 1, color: colors.textSub }]}>PLAYER</Text>
           <Text style={[s.catLabel, { width: 50, textAlign: "center", color: colors.textSub }]}>OPP</Text>
