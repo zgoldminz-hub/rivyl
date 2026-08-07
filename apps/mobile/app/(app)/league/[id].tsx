@@ -133,7 +133,7 @@ export default function LeagueScreen() {
       style={[s.header, { paddingTop: insets.top + 10 }]}
     >
       <TouchableOpacity onPress={() => router.replace("/(app)/dashboard" as any)} style={s.headerLogo} activeOpacity={0.75}>
-        <Image source={RV_LOGO} style={{ width: 72, height: 18 }} resizeMode="contain" />
+        <Image source={RV_LOGO} style={{ width: 72, height: 18, tintColor: "#ffffff" }} resizeMode="contain" />
       </TouchableOpacity>
       <View style={s.headerCenter}>
         <Text style={s.headerLeagueName} numberOfLines={1}>{league?.name ?? "League"}</Text>
