@@ -395,6 +395,31 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
     setSwap(null);
   }
 
+  function autoSetLineup() {
+    const getProj = (r: RosterSlot) => r.projected ?? MOCK_PROJ[r.position ?? r.slot] ?? 0;
+    const pool = [...roster].filter(r => !r.gameStarted).sort((a, b) => getProj(b) - getProj(a));
+    const locked = roster.filter(r => r.gameStarted);
+    const used = new Set<string>(locked.map(r => r.id));
+    const result: RosterSlot[] = [...locked];
+
+    for (const slotName of STARTER_ORDER) {
+      if (locked.some(r => r.slot === slotName)) continue;
+      const eligible = pool.filter(p => {
+        if (used.has(p.id)) return false;
+        if (slotName === "FLEX") return ["RB", "WR", "TE"].includes(p.position ?? "");
+        return p.position === slotName;
+      });
+      if (eligible.length > 0) {
+        used.add(eligible[0].id);
+        result.push({ ...eligible[0], slot: slotName });
+      }
+    }
+    pool.forEach(p => { if (!used.has(p.id)) result.push({ ...p, slot: "BENCH" }); });
+    setRoster(result);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
   async function saveLineup() {
     setSaving(true);
     await api.post(`/season/${leagueId}/lineup`, {
@@ -502,30 +527,40 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             <Text style={[s.swapHint, { color: colors.accent }]}>Tap a player to swap with {swap.name ?? swap.slot}</Text>
           </View>
         )}
-        {/* Edit Lineup button — sits right above the player list */}
+        {/* Set Lineup + Auto Set row */}
         {!isLocked && (
           !editMode ? (
-            <TouchableOpacity
-              style={[s.lineupEditBar, { backgroundColor: "#C81A1A" }]}
-              onPress={() => setEditMode(true)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="create-outline" size={16} color="#fff" />
-              <Text style={s.lineupEditBarText}>Edit Lineup</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+              <TouchableOpacity
+                style={[s.lineupEditBar, { backgroundColor: "#C81A1A", flex: 1, marginBottom: 0 }]}
+                onPress={() => setEditMode(true)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="create-outline" size={14} color="#fff" />
+                <Text style={s.lineupEditBarText}>Set Lineup</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.lineupEditBar, { flex: 0, paddingHorizontal: 16, backgroundColor: "transparent", borderWidth: 1.5, borderColor: "#C81A1A", marginBottom: 0 }]}
+                onPress={autoSetLineup}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="flash" size={14} color="#C81A1A" />
+                <Text style={[s.lineupEditBarText, { color: "#C81A1A" }]}>Auto</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
-            <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
               <TouchableOpacity
                 style={[s.lineupEditBar, { backgroundColor: "#22c55e", flex: 1, marginBottom: 0 }]}
                 onPress={saveLineup}
                 disabled={saving}
                 activeOpacity={0.85}
               >
-                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Ionicons name="checkmark" size={14} color="#fff" />
                 <Text style={s.lineupEditBarText}>{saving ? "Saving…" : "Save Lineup"}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.lineupEditBar, { flex: 0, paddingHorizontal: 20, backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}
+                style={[s.lineupEditBar, { flex: 0, paddingHorizontal: 16, backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}
                 onPress={() => { setEditMode(false); setSwap(null); }}
               >
                 <Text style={[s.lineupEditBarText, { color: colors.textSub }]}>Cancel</Text>
@@ -1133,8 +1168,8 @@ const s = StyleSheet.create({
   playerName: { fontSize: 13, fontWeight: "600" },
   playerMeta: { fontSize: 11, marginTop: 1 },
   pts: { fontSize: 14, fontWeight: "700" },
-  lineupEditBar: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, paddingVertical: 13, marginBottom: 14 },
-  lineupEditBarText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  lineupEditBar: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, paddingVertical: 10, marginBottom: 14 },
+  lineupEditBarText: { fontSize: 13, fontWeight: "700", color: "#fff" },
   lockBadge: { position: "absolute", bottom: 0, right: 0, width: 15, height: 15, borderRadius: 8, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center" },
   projScoreCol: { alignItems: "flex-end", gap: 3 },
   projScoreRow: { flexDirection: "row", alignItems: "center", gap: 5 },
