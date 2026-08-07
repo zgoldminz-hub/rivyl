@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import * as ImagePicker from "expo-image-picker";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Alert, TextInput, Modal, Image, Clipboard,
@@ -66,30 +67,57 @@ const POS_COLORS: Record<string, string> = {
   QB: "#f59e0b", RB: "#22c55e", WR: "#4f7cff", TE: "#a78bfa",
   K: "#6b7280", DEF: "#ef4444", FLEX: "#22c55e", BENCH: "#374151",
 };
-const TEAM_LOGOS: { id: string; emoji: string; gradient: [string, string] }[] = [
-  { id: "rv",      emoji: "✦",  gradient: ["#C81A1A", "#7520CC"] },
-  { id: "eagle",   emoji: "🦅", gradient: ["#1834D4", "#C81A1A"] },
-  { id: "bolt",    emoji: "⚡", gradient: ["#eab308", "#f97316"] },
-  { id: "fire",    emoji: "🔥", gradient: ["#ef4444", "#f97316"] },
-  { id: "crown",   emoji: "👑", gradient: ["#d97706", "#C81A1A"] },
-  { id: "wolf",    emoji: "🐺", gradient: ["#374151", "#6b7280"] },
-  { id: "lion",    emoji: "🦁", gradient: ["#f97316", "#eab308"] },
-  { id: "gem",     emoji: "💎", gradient: ["#06b6d4", "#4f7cff"] },
-  { id: "rocket",  emoji: "🚀", gradient: ["#7520CC", "#4f7cff"] },
-  { id: "bull",    emoji: "🐂", gradient: ["#ef4444", "#7c3aed"] },
-  { id: "snake",   emoji: "🐍", gradient: ["#22c55e", "#1834D4"] },
-  { id: "star",    emoji: "⭐", gradient: ["#eab308", "#C81A1A"] },
-  { id: "ice",     emoji: "❄️", gradient: ["#06b6d4", "#1834D4"] },
-  { id: "skull",   emoji: "💀", gradient: ["#374151", "#C81A1A"] },
-  { id: "sword",   emoji: "⚔️", gradient: ["#94a3b8", "#1834D4"] },
-  { id: "demon",   emoji: "😈", gradient: ["#7520CC", "#C81A1A"] },
-  { id: "ghost",   emoji: "👻", gradient: ["#4f7cff", "#818cf8"] },
-  { id: "tiger",   emoji: "🐯", gradient: ["#f97316", "#eab308"] },
-  { id: "bomb",    emoji: "💣", gradient: ["#374151", "#6b7280"] },
-  { id: "shield",  emoji: "🛡️", gradient: ["#1834D4", "#7520CC"] },
+const TEAM_LOGOS: { id: string; icon: string; gradient: [string, string] }[] = [
+  { id: "flame",        icon: "flame",         gradient: ["#ef4444", "#f97316"] },
+  { id: "bolt",         icon: "flash",         gradient: ["#fbbf24", "#f97316"] },
+  { id: "trophy",       icon: "trophy",        gradient: ["#d97706", "#fbbf24"] },
+  { id: "shield",       icon: "shield",        gradient: ["#1d4ed8", "#7c3aed"] },
+  { id: "skull",        icon: "skull",         gradient: ["#1f2937", "#C81A1A"] },
+  { id: "football",     icon: "football",      gradient: ["#78350f", "#b45309"] },
+  { id: "rocket",       icon: "rocket",        gradient: ["#7c3aed", "#4f46e5"] },
+  { id: "star",         icon: "star",          gradient: ["#C81A1A", "#d97706"] },
+  { id: "paw",          icon: "paw",           gradient: ["#ea580c", "#fbbf24"] },
+  { id: "barbell",      icon: "barbell",       gradient: ["#374151", "#6b7280"] },
+  { id: "snow",         icon: "snow",          gradient: ["#0891b2", "#1d4ed8"] },
+  { id: "planet",       icon: "planet",        gradient: ["#7c3aed", "#C81A1A"] },
+  { id: "nuclear",      icon: "nuclear",       gradient: ["#16a34a", "#374151"] },
+  { id: "airplane",     icon: "airplane",      gradient: ["#475569", "#4f46e5"] },
+  { id: "hammer",       icon: "hammer",        gradient: ["#374151", "#C81A1A"] },
+  { id: "eye",          icon: "eye",           gradient: ["#dc2626", "#7c3aed"] },
+  { id: "leaf",         icon: "leaf",          gradient: ["#16a34a", "#0d9488"] },
+  { id: "basketball",   icon: "basketball",    gradient: ["#ea580c", "#C81A1A"] },
+  { id: "fish",         icon: "fish",          gradient: ["#0284c7", "#06b6d4"] },
+  { id: "baseball",     icon: "baseball",      gradient: ["#C81A1A", "#374151"] },
+  { id: "compass",      icon: "compass",       gradient: ["#1d4ed8", "#0891b2"] },
+  { id: "speedometer",  icon: "speedometer",   gradient: ["#C81A1A", "#f97316"] },
+  { id: "thunderstorm", icon: "thunderstorm",  gradient: ["#1d4ed8", "#7c3aed"] },
+  { id: "bug",          icon: "bug",           gradient: ["#16a34a", "#1f2937"] },
+  { id: "bonfire",      icon: "bonfire",       gradient: ["#C81A1A", "#ea580c"] },
+  { id: "telescope",    icon: "telescope",     gradient: ["#7c3aed", "#0891b2"] },
+  { id: "diamond",      icon: "diamond",       gradient: ["#06b6d4", "#4f46e5"] },
+  { id: "headset",      icon: "headset",       gradient: ["#374151", "#4f46e5"] },
+  { id: "car",          icon: "car-sport",     gradient: ["#dc2626", "#374151"] },
+  { id: "magnet",       icon: "magnet",        gradient: ["#C81A1A", "#7c3aed"] },
 ];
 
-function TeamAvatar({ logoId, size = 54 }: { logoId?: string | null; size?: number }) {
+async function loadSavedPhotoUri(teamId: string): Promise<string | null> {
+  try {
+    const AS = require("@react-native-async-storage/async-storage").default;
+    return await AS.getItem(`rivyl_avatar_${teamId}`);
+  } catch { return null; }
+}
+async function savePhotoUri(teamId: string, uri: string | null) {
+  try {
+    const AS = require("@react-native-async-storage/async-storage").default;
+    if (uri) await AS.setItem(`rivyl_avatar_${teamId}`, uri);
+    else await AS.removeItem(`rivyl_avatar_${teamId}`);
+  } catch {}
+}
+
+function TeamAvatar({ logoId, photoUri, size = 54 }: { logoId?: string | null; photoUri?: string | null; size?: number }) {
+  if (photoUri) {
+    return <Image source={{ uri: photoUri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  }
   const logo = TEAM_LOGOS.find(l => l.id === logoId) ?? TEAM_LOGOS[0];
   return (
     <LinearGradient
@@ -98,7 +126,7 @@ function TeamAvatar({ logoId, size = 54 }: { logoId?: string | null; size?: numb
       end={{ x: 1, y: 1 }}
       style={{ width: size, height: size, borderRadius: size / 2, alignItems: "center", justifyContent: "center" }}
     >
-      <Text style={{ fontSize: size * 0.4, lineHeight: size * 0.52 }}>{logo.emoji}</Text>
+      <Ionicons name={logo.icon as any} size={Math.round(size * 0.46)} color="#fff" />
     </LinearGradient>
   );
 }
@@ -359,8 +387,9 @@ function TeamsCard({ league }: { league: LeagueDetail }) {
 
 function MyTeamTab({ leagueId }: { leagueId: string }) {
   const { colors } = useTheme();
-  const [team, setTeam] = useState<{ id: string; name: string; abbreviation?: string; avatarId?: string; ownerName?: string } | null>(null);
+  const [team, setTeam] = useState<{ id: string; name: string; abbreviation?: string; avatarId?: string; ownerName?: string; photoUri?: string | null } | null>(null);
   const [pendingLogoId, setPendingLogoId] = useState<string>(TEAM_LOGOS[0].id);
+  const [pendingPhotoUri, setPendingPhotoUri] = useState<string | null>(null);
   const [record, setRecord] = useState<{ wins: number; losses: number } | null>(null);
   const [roster, setRoster] = useState<RosterSlot[]>([]);
   const [currentWeek, setCurrentWeek] = useState(1);
@@ -388,12 +417,14 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
       ]);
       if (teamRes.ok) {
         const t = teamRes.data.team;
+        const savedPhoto = await loadSavedPhotoUri(t.id);
         setTeam({
           id: t.id, name: t.name, abbreviation: t.abbreviation,
           avatarId: t.avatarId ?? null,
           ownerName: t.user?.firstName && t.user?.lastName
             ? `${t.user.firstName} ${t.user.lastName}`
             : (t.user?.username ?? t.ownerName ?? null),
+          photoUri: savedPhoto,
         });
         setRoster(teamRes.data.roster);
         setCurrentWeek(teamRes.data.currentWeek);
@@ -499,15 +530,56 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
     setTeamName(team?.name ?? "");
     setTeamAbbr(team?.abbreviation ?? "");
     setPendingLogoId(team?.avatarId ?? TEAM_LOGOS[0].id);
+    setPendingPhotoUri(team?.photoUri ?? null);
     setSettingsOpen(true);
+  }
+
+  async function pickFromCameraRoll() {
+    Alert.alert(
+      "Upload Team Photo",
+      "Your photo will be stored on this device and used as your team avatar. Please ensure your photo does not contain offensive, hateful, or inappropriate content.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Choose Photo",
+          onPress: async () => {
+            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!perm.granted) {
+              Alert.alert("Permission Required", "Please allow photo library access in Settings to choose a team photo.");
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets?.[0]?.uri) {
+              setPendingPhotoUri(result.assets[0].uri);
+            }
+          },
+        },
+      ]
+    );
   }
 
   async function saveTeamSettings() {
     setSavingSettings(true);
-    const res = await api.post(`/season/${leagueId}/team/settings`, { name: teamName, abbreviation: teamAbbr, avatarId: pendingLogoId });
+    const avatarIdToSave = pendingPhotoUri ? null : pendingLogoId;
+    const res = await api.post(`/season/${leagueId}/team/settings`, {
+      name: teamName, abbreviation: teamAbbr,
+      avatarId: avatarIdToSave,
+    });
     setSavingSettings(false);
     if (res.ok) {
-      setTeam((prev) => prev ? { ...prev, name: teamName, abbreviation: teamAbbr, avatarId: pendingLogoId } : prev);
+      if (team?.id) await savePhotoUri(team.id, pendingPhotoUri);
+      setTeam((prev) => prev ? {
+        ...prev,
+        name: teamName,
+        abbreviation: teamAbbr,
+        avatarId: avatarIdToSave ?? undefined,
+        photoUri: pendingPhotoUri,
+      } : prev);
       setSettingsOpen(false);
     } else Alert.alert("Error", (res as any).error ?? "Failed to save settings");
   }
@@ -538,7 +610,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         {/* Team avatar + name row */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 14 }}>
           <TouchableOpacity onPress={openSettings} activeOpacity={0.8}>
-            <TeamAvatar logoId={team?.avatarId} size={58} />
+            <TeamAvatar logoId={team?.avatarId} photoUri={team?.photoUri} size={58} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -748,26 +820,48 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
 
             {/* Logo preview + picker */}
             <Text style={[s.settingsFieldLabel, { color: colors.textSub }]}>Team Logo</Text>
-            <View style={{ alignItems: "center", marginBottom: 14 }}>
-              <TeamAvatar logoId={pendingLogoId} size={68} />
+            <View style={{ alignItems: "center", marginBottom: 12 }}>
+              <TeamAvatar logoId={pendingPhotoUri ? null : pendingLogoId} photoUri={pendingPhotoUri} size={68} />
             </View>
+
+            {/* Camera roll button */}
+            <TouchableOpacity
+              onPress={pickFromCameraRoll}
+              activeOpacity={0.8}
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginBottom: 8 }}
+            >
+              <Ionicons name="image-outline" size={18} color={colors.text} />
+              <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>Upload from Photos</Text>
+            </TouchableOpacity>
+
+            {pendingPhotoUri && (
+              <TouchableOpacity
+                onPress={() => setPendingPhotoUri(null)}
+                activeOpacity={0.75}
+                style={{ alignItems: "center", marginBottom: 10 }}
+              >
+                <Text style={{ color: "#ef4444", fontSize: 12, fontWeight: "600" }}>Remove Photo</Text>
+              </TouchableOpacity>
+            )}
+
+            <Text style={[s.settingsFieldLabel, { color: colors.textSub, marginBottom: 8 }]}>Or pick an icon</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }}>
               <View style={{ flexDirection: "row", gap: 10, paddingVertical: 4 }}>
                 {TEAM_LOGOS.map((logo) => (
                   <TouchableOpacity
                     key={logo.id}
-                    onPress={() => setPendingLogoId(logo.id)}
+                    onPress={() => { setPendingLogoId(logo.id); setPendingPhotoUri(null); }}
                     activeOpacity={0.75}
                     style={{ position: "relative" }}
                   >
                     <View style={{
                       borderRadius: 26, borderWidth: 2,
-                      borderColor: pendingLogoId === logo.id ? colors.accent : "transparent",
+                      borderColor: !pendingPhotoUri && pendingLogoId === logo.id ? colors.accent : "transparent",
                       padding: 2,
                     }}>
                       <TeamAvatar logoId={logo.id} size={44} />
                     </View>
-                    {pendingLogoId === logo.id && (
+                    {!pendingPhotoUri && pendingLogoId === logo.id && (
                       <View style={{ position: "absolute", bottom: 0, right: 0, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" }}>
                         <Ionicons name="checkmark" size={10} color="#fff" />
                       </View>
