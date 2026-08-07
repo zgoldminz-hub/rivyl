@@ -569,7 +569,10 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             <Text style={[s.weekLabel, { color: colors.text }]}>
               Week {selectedWeek}{selectedWeek === currentWeek ? " · Current" : selectedWeek < currentWeek ? " · Past" : " · Upcoming"}
             </Text>
-            <Ionicons name="chevron-down" size={14} color={colors.textSub} />
+            <View style={{ alignItems: "center" }}>
+              <Ionicons name="chevron-up" size={11} color={colors.textSub} style={{ marginBottom: -3 }} />
+              <Ionicons name="chevron-down" size={11} color={colors.textSub} />
+            </View>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setSelectedWeek((w) => Math.min(MAX_WEEK, w + 1))}
@@ -582,7 +585,7 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
 
         {/* Row 3: matchup mini-card */}
         {matchupPreview && (
-          <View style={[s.matchupMini, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[s.matchupMini, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
             <View style={s.matchupMiniHalf}>
               <Text style={[s.matchupMiniTeam, { color: colors.text }]} numberOfLines={1}>{team?.name}</Text>
               <Text style={[s.matchupMiniScore, { color: pts > matchupPreview.oppScore ? "#22c55e" : colors.text }]}>
@@ -1524,7 +1527,7 @@ const s = StyleSheet.create({
   settingsBtnText: { fontSize: 12, fontWeight: "600" },
   heroEditBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   heroEditBtnText: { fontSize: 12, fontWeight: "700", color: "#fff" },
-  weekRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 8, gap: 12 },
+  weekRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 0, gap: 12 },
   weekArrow: { padding: 4 },
   matchupMini: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
   matchupMiniHalf: { flex: 1 },
