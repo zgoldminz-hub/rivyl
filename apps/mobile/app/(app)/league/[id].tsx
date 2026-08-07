@@ -67,6 +67,9 @@ const POS_COLORS: Record<string, string> = {
   K: "#6b7280", DEF: "#ef4444", FLEX: "#22c55e", BENCH: "#374151",
 };
 const STARTER_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "K", "DEF"];
+const MOCK_PROJ: Record<string, number> = {
+  QB: 22.5, RB: 10.8, WR: 11.4, TE: 8.2, FLEX: 10.8, K: 8.0, DEF: 7.5, BENCH: 6.0,
+};
 const STATUS_COLOR: Record<string, string> = {
   SETUP: "#6b7280", DRAFTING: "#f59e0b", ACTIVE: "#22c55e",
   PLAYOFFS: "#a78bfa", COMPLETE: "#374151",
@@ -969,14 +972,16 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
       <View style={s.projScoreCol}>
         <View style={s.projScoreRow}>
           <Text style={[s.projLabel, { color: colors.textSub }]}>PROJ</Text>
-          <Text style={[s.projValue, { color: colors.textSub }]}>
-            {slot.projected != null ? slot.projected.toFixed(1) : "—"}
+          <Text style={[s.projValue, { color: colors.text }]}>
+            {slot.projected != null
+              ? slot.projected.toFixed(1)
+              : (MOCK_PROJ[slot.position ?? slot.slot] ?? 0).toFixed(1)}
           </Text>
         </View>
         <View style={s.projScoreRow}>
           <Text style={[s.projLabel, { color: colors.textSub }]}>SCORE</Text>
           <Text style={[s.projValue, { color: (slot.points ?? 0) > 0 ? colors.text : colors.textSub }]}>
-            {slot.points != null ? slot.points.toFixed(1) : "—"}
+            {slot.points != null && slot.points > 0 ? slot.points.toFixed(1) : "—"}
           </Text>
         </View>
       </View>
@@ -1105,8 +1110,8 @@ const s = StyleSheet.create({
   pts: { fontSize: 14, fontWeight: "700" },
   projScoreCol: { alignItems: "flex-end", gap: 3 },
   projScoreRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  projLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4, width: 34, textAlign: "right" },
-  projValue: { fontSize: 13, fontWeight: "700", width: 34, textAlign: "right" },
+  projLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3, width: 42, textAlign: "right" },
+  projValue: { fontSize: 13, fontWeight: "700", width: 36, textAlign: "right" },
 
   subTabRow: { flexDirection: "row", borderBottomWidth: 1 },
   subTab: { flex: 1, paddingVertical: 11, alignItems: "center" },
