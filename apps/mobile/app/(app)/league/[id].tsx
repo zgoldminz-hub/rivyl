@@ -28,7 +28,7 @@ interface RosterSlot {
   id: string; playerId: string; slot: string; points: number | null;
   projected?: number | null; gameStarted?: boolean;
   name?: string; position?: string; team?: string | null;
-  headshotUrl?: string; statLine?: string;
+  opponent?: string | null; headshotUrl?: string; statLine?: string;
 }
 interface MatchupSummary {
   id: string; week: number; homeScore: number; awayScore: number;
@@ -67,6 +67,12 @@ const POS_COLORS: Record<string, string> = {
   K: "#6b7280", DEF: "#ef4444", FLEX: "#22c55e", BENCH: "#374151",
 };
 const STARTER_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "K", "DEF"];
+function abbrevName(name?: string | null): string {
+  if (!name) return "—";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return name;
+  return `${parts[0][0]}. ${parts.slice(1).join(" ")}`;
+}
 const MOCK_PROJ: Record<string, number> = {
   QB: 22.5, RB: 10.8, WR: 11.4, TE: 8.2, FLEX: 10.8, K: 8.0, DEF: 7.5, BENCH: 6.0,
 };
@@ -529,9 +535,9 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
                 <Text style={s.lineupEditBarText}>Set Lineup</Text>
               </TouchableOpacity>
               <View style={{ flex: 1 }} />
+              <View style={{ width: 50 }} />
               <Text style={[s.projCell, { color: colors.text, fontWeight: "800", fontSize: 14 }]}>{totalProj.toFixed(1)}</Text>
               <Text style={[s.scoreCell, { color: hasScore ? colors.text : colors.textSub, fontWeight: "800", fontSize: 14 }]}>{hasScore ? pts.toFixed(1) : "—"}</Text>
-              <View style={{ width: 32 }} />
             </View>
           ) : (
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 6 }}>
@@ -554,11 +560,15 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
           )
         )}
 
-        {/* Column headers */}
-        <View style={s.colHeaderRow}>
-          <View style={{ flex: 1 }} />
-          <Text style={[s.colHeaderText, { color: colors.textSub }]}>PROJ</Text>
-          <Text style={[s.colHeaderText, { color: colors.textSub }]}>SCORE</Text>
+        {/* Category header row */}
+        <View style={[s.categoryRow, { borderBottomColor: colors.border }]}>
+          <View style={{ width: 94 }}>
+            <Text style={[s.catLabel, { color: colors.textSub }]}>POS</Text>
+          </View>
+          <Text style={[s.catLabel, { flex: 1, color: colors.textSub }]}>PLAYER</Text>
+          <Text style={[s.catLabel, { width: 50, textAlign: "center", color: colors.textSub }]}>OPP</Text>
+          <Text style={[s.catLabel, { width: 48, textAlign: "center", color: colors.textSub }]}>PROJ</Text>
+          <Text style={[s.catLabel, { width: 52, textAlign: "center", color: colors.textSub }]}>SCORE</Text>
           {editMode && <View style={{ width: 32 }} />}
         </View>
 
@@ -1025,13 +1035,16 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast, editMod
         )}
       </View>
       <View style={s.playerInfo}>
-        <Text style={[s.playerName, { color: colors.text }]} numberOfLines={1}>{slot.name ?? slot.playerId}</Text>
+        <Text style={[s.playerName, { color: colors.text }]} numberOfLines={1}>{abbrevName(slot.name) ?? slot.playerId}</Text>
         {showStats && slot.statLine ? (
           <Text style={[s.playerMeta, { color: colors.textSub }]} numberOfLines={1}>{slot.statLine}</Text>
         ) : slot.position ? (
           <Text style={[s.playerMeta, { color: colors.textSub }]}>{slot.position}{slot.team ? ` · ${slot.team}` : ""}</Text>
         ) : null}
       </View>
+      <Text style={[s.oppCell, { color: colors.textSub }]} numberOfLines={1}>
+        {slot.opponent ?? "—"}
+      </Text>
       <Text style={[s.projCell, { color: colors.textSub }]}>
         {slot.projected != null
           ? slot.projected.toFixed(1)
@@ -1185,10 +1198,11 @@ const s = StyleSheet.create({
   lineupEditBarText: { fontSize: 13, fontWeight: "700", color: "#fff" },
   lockBadge: { position: "absolute", bottom: 0, right: 0, width: 15, height: 15, borderRadius: 8, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center" },
   moveHandle: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", marginLeft: 6 },
-  colHeaderRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 4, paddingBottom: 4, paddingTop: 2 },
-  colHeaderText: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, width: 48, textAlign: "right" },
-  projCell: { fontSize: 13, fontWeight: "600", width: 48, textAlign: "right" },
-  scoreCell: { fontSize: 13, fontWeight: "600", width: 48, textAlign: "right" },
+  categoryRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 4, paddingBottom: 5, paddingTop: 2, borderBottomWidth: 1, marginBottom: 2 },
+  catLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6 },
+  oppCell: { width: 50, textAlign: "center", fontSize: 11, fontWeight: "600" },
+  projCell: { fontSize: 13, fontWeight: "600", width: 48, textAlign: "center" },
+  scoreCell: { fontSize: 13, fontWeight: "600", width: 52, textAlign: "center" },
 
   subTabRow: { flexDirection: "row", borderBottomWidth: 1 },
   subTab: { flex: 1, paddingVertical: 11, alignItems: "center" },
