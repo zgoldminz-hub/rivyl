@@ -66,6 +66,43 @@ const POS_COLORS: Record<string, string> = {
   QB: "#f59e0b", RB: "#22c55e", WR: "#4f7cff", TE: "#a78bfa",
   K: "#6b7280", DEF: "#ef4444", FLEX: "#22c55e", BENCH: "#374151",
 };
+const TEAM_LOGOS: { id: string; emoji: string; gradient: [string, string] }[] = [
+  { id: "rv",      emoji: "✦",  gradient: ["#C81A1A", "#7520CC"] },
+  { id: "eagle",   emoji: "🦅", gradient: ["#1834D4", "#C81A1A"] },
+  { id: "bolt",    emoji: "⚡", gradient: ["#eab308", "#f97316"] },
+  { id: "fire",    emoji: "🔥", gradient: ["#ef4444", "#f97316"] },
+  { id: "crown",   emoji: "👑", gradient: ["#d97706", "#C81A1A"] },
+  { id: "wolf",    emoji: "🐺", gradient: ["#374151", "#6b7280"] },
+  { id: "lion",    emoji: "🦁", gradient: ["#f97316", "#eab308"] },
+  { id: "gem",     emoji: "💎", gradient: ["#06b6d4", "#4f7cff"] },
+  { id: "rocket",  emoji: "🚀", gradient: ["#7520CC", "#4f7cff"] },
+  { id: "bull",    emoji: "🐂", gradient: ["#ef4444", "#7c3aed"] },
+  { id: "snake",   emoji: "🐍", gradient: ["#22c55e", "#1834D4"] },
+  { id: "star",    emoji: "⭐", gradient: ["#eab308", "#C81A1A"] },
+  { id: "ice",     emoji: "❄️", gradient: ["#06b6d4", "#1834D4"] },
+  { id: "skull",   emoji: "💀", gradient: ["#374151", "#C81A1A"] },
+  { id: "sword",   emoji: "⚔️", gradient: ["#94a3b8", "#1834D4"] },
+  { id: "demon",   emoji: "😈", gradient: ["#7520CC", "#C81A1A"] },
+  { id: "ghost",   emoji: "👻", gradient: ["#4f7cff", "#818cf8"] },
+  { id: "tiger",   emoji: "🐯", gradient: ["#f97316", "#eab308"] },
+  { id: "bomb",    emoji: "💣", gradient: ["#374151", "#6b7280"] },
+  { id: "shield",  emoji: "🛡️", gradient: ["#1834D4", "#7520CC"] },
+];
+
+function TeamAvatar({ logoId, size = 54 }: { logoId?: string | null; size?: number }) {
+  const logo = TEAM_LOGOS.find(l => l.id === logoId) ?? TEAM_LOGOS[0];
+  return (
+    <LinearGradient
+      colors={logo.gradient}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ width: size, height: size, borderRadius: size / 2, alignItems: "center", justifyContent: "center" }}
+    >
+      <Text style={{ fontSize: size * 0.4, lineHeight: size * 0.52 }}>{logo.emoji}</Text>
+    </LinearGradient>
+  );
+}
+
 const STARTER_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "K", "DEF"];
 function abbrevName(name?: string | null): string {
   if (!name) return "—";
@@ -322,7 +359,8 @@ function TeamsCard({ league }: { league: LeagueDetail }) {
 
 function MyTeamTab({ leagueId }: { leagueId: string }) {
   const { colors } = useTheme();
-  const [team, setTeam] = useState<{ id: string; name: string; abbreviation?: string } | null>(null);
+  const [team, setTeam] = useState<{ id: string; name: string; abbreviation?: string; avatarId?: string; ownerName?: string } | null>(null);
+  const [pendingLogoId, setPendingLogoId] = useState<string>(TEAM_LOGOS[0].id);
   const [record, setRecord] = useState<{ wins: number; losses: number } | null>(null);
   const [roster, setRoster] = useState<RosterSlot[]>([]);
   const [currentWeek, setCurrentWeek] = useState(1);
@@ -348,13 +386,21 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         api.get<{ standings: StandingRow[] }>(`/season/${leagueId}/standings`),
       ]);
       if (teamRes.ok) {
-        setTeam(teamRes.data.team);
+        const t = teamRes.data.team;
+        setTeam({
+          id: t.id, name: t.name, abbreviation: t.abbreviation,
+          avatarId: t.avatarId ?? null,
+          ownerName: t.user?.firstName && t.user?.lastName
+            ? `${t.user.firstName} ${t.user.lastName}`
+            : (t.user?.username ?? t.ownerName ?? null),
+        });
         setRoster(teamRes.data.roster);
         setCurrentWeek(teamRes.data.currentWeek);
         setSelectedWeek(teamRes.data.currentWeek);
-        setIsLocked(false); // pre-game: current week always editable
-        setTeamName(teamRes.data.team?.name ?? "");
-        setTeamAbbr(teamRes.data.team?.abbreviation ?? "");
+        setIsLocked(false);
+        setTeamName(t.name ?? "");
+        setTeamAbbr(t.abbreviation ?? "");
+        setPendingLogoId(t.avatarId ?? TEAM_LOGOS[0].id);
         if (standingsRes.ok) {
           const row = standingsRes.data.standings.find((r) => r.teamId === teamRes.data.team?.id);
           if (row) setRecord({ wins: row.wins, losses: row.losses });
@@ -448,12 +494,19 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
     setTimeout(() => setSaved(false), 2000);
   }
 
+  function openSettings() {
+    setTeamName(team?.name ?? "");
+    setTeamAbbr(team?.abbreviation ?? "");
+    setPendingLogoId(team?.avatarId ?? TEAM_LOGOS[0].id);
+    setSettingsOpen(true);
+  }
+
   async function saveTeamSettings() {
     setSavingSettings(true);
-    const res = await api.post(`/season/${leagueId}/team/settings`, { name: teamName, abbreviation: teamAbbr });
+    const res = await api.post(`/season/${leagueId}/team/settings`, { name: teamName, abbreviation: teamAbbr, avatarId: pendingLogoId });
     setSavingSettings(false);
     if (res.ok) {
-      setTeam((prev) => prev ? { ...prev, name: teamName, abbreviation: teamAbbr } : prev);
+      setTeam((prev) => prev ? { ...prev, name: teamName, abbreviation: teamAbbr, avatarId: pendingLogoId } : prev);
       setSettingsOpen(false);
     } else Alert.alert("Error", (res as any).error ?? "Failed to save settings");
   }
@@ -481,17 +534,25 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         end={{ x: 1, y: 0 }}
         style={[s.teamHero, { borderBottomColor: colors.border }]}
       >
-        {/* Row 1: name + gear inline + record */}
-        <View style={s.heroTopRow}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <Text style={[s.myTeamName, { color: colors.text, flex: 1 }]} numberOfLines={1}>{team?.name}</Text>
-            <TouchableOpacity style={[s.settingsBtn, { borderColor: colors.border }]} onPress={() => setSettingsOpen(true)}>
-              <Ionicons name="settings-outline" size={16} color={colors.textSub} />
-            </TouchableOpacity>
+        {/* Team avatar + name row */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 14 }}>
+          <TouchableOpacity onPress={openSettings} activeOpacity={0.8}>
+            <TeamAvatar logoId={team?.avatarId} size={58} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={[s.myTeamName, { color: colors.text, flex: 1 }]} numberOfLines={1}>{team?.name}</Text>
+              <TouchableOpacity onPress={openSettings} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="settings-outline" size={16} color={colors.textSub} />
+              </TouchableOpacity>
+            </View>
+            {team?.ownerName ? (
+              <Text style={[s.recordText, { color: colors.textSub, marginTop: 2 }]}>{team.ownerName}</Text>
+            ) : null}
+            {record && (
+              <Text style={[{ fontSize: 11, color: colors.textSub, fontWeight: "600", marginTop: 2 }]}>{record.wins}–{record.losses}</Text>
+            )}
           </View>
-          {record && (
-            <Text style={[s.recordText, { color: colors.textSub }]}>{record.wins}–{record.losses}</Text>
-          )}
         </View>
 
         {/* Row 2: week selector */}
@@ -551,52 +612,52 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             <Text style={[s.swapHint, { color: colors.accent }]}>Tap a player to swap with {swap.name ?? swap.slot}</Text>
           </View>
         )}
-        {/* Set Lineup row + totals aligned to columns */}
-        {!isLocked && (
-          !editMode ? (
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-              <TouchableOpacity
-                style={[s.lineupEditBar, { backgroundColor: "#C81A1A", marginBottom: 0, paddingHorizontal: 20 }]}
-                onPress={() => setEditMode(true)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="create-outline" size={14} color="#fff" />
-                <Text style={s.lineupEditBarText}>Set Lineup</Text>
-              </TouchableOpacity>
-              <View style={{ flex: 1 }} />
-              <View style={{ width: 50 }} />
-              <Text style={[s.projCell, { color: colors.text, fontWeight: "800", fontSize: 14 }]}>{totalProj.toFixed(1)}</Text>
-              <Text style={[s.scoreCell, { color: hasScore ? colors.text : colors.textSub, fontWeight: "800", fontSize: 14 }]}>{hasScore ? pts.toFixed(1) : "—"}</Text>
-            </View>
-          ) : (
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 6 }}>
-              <TouchableOpacity
-                style={[s.lineupEditBar, { backgroundColor: "#22c55e", flex: 1, marginBottom: 0 }]}
-                onPress={saveLineup}
-                disabled={saving}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="checkmark" size={14} color="#fff" />
-                <Text style={s.lineupEditBarText}>{saving ? "Saving…" : "Save Lineup"}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.lineupEditBar, { flex: 0, paddingHorizontal: 16, backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}
-                onPress={() => { setEditMode(false); setSwap(null); }}
-              >
-                <Text style={[s.lineupEditBarText, { color: colors.textSub }]}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          )
+        {/* Edit mode save/cancel bar */}
+        {!isLocked && editMode && (
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+            <TouchableOpacity
+              style={[s.lineupEditBar, { backgroundColor: "#22c55e", flex: 1, marginBottom: 0 }]}
+              onPress={saveLineup}
+              disabled={saving}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark" size={14} color="#fff" />
+              <Text style={s.lineupEditBarText}>{saving ? "Saving…" : "Save Lineup"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.lineupEditBar, { flex: 0, paddingHorizontal: 16, backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}
+              onPress={() => { setEditMode(false); setSwap(null); }}
+            >
+              <Text style={[s.lineupEditBarText, { color: colors.textSub }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
-        {/* Category header row — gap: 12 mirrors playerRow gap */}
-        <View style={[s.categoryRow, { borderBottomColor: colors.border, gap: 12 }]}>
-          <Text style={[s.catLabel, { width: 32, textAlign: "center", color: colors.textSub }]}>POS</Text>
+        {/* Combined header: Set Lineup left · totals stacked above PROJ/SCORE columns */}
+        <View style={[s.categoryRow, { borderBottomColor: colors.border, gap: 12, paddingBottom: 6, paddingTop: 4 }]}>
+          {!isLocked && !editMode ? (
+            <TouchableOpacity
+              style={[s.lineupEditBar, { backgroundColor: "#C81A1A", marginBottom: 0, paddingHorizontal: 14, paddingVertical: 7, flex: 0 }]}
+              onPress={() => setEditMode(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="create-outline" size={13} color="#fff" />
+              <Text style={[s.lineupEditBarText, { fontSize: 12 }]}>Set Lineup</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 32 }} />
+          )}
           <View style={{ width: 38 }} />
           <Text style={[s.catLabel, { flex: 1, color: colors.textSub }]}>PLAYER</Text>
           <Text style={[s.catLabel, { width: 50, textAlign: "center", color: colors.textSub }]}>OPP</Text>
-          <Text style={[s.catLabel, { width: 48, textAlign: "center", color: colors.textSub }]}>PROJ</Text>
-          <Text style={[s.catLabel, { width: 52, textAlign: "center", color: colors.textSub }]}>SCORE</Text>
+          <View style={{ width: 48, alignItems: "center" }}>
+            <Text style={{ color: colors.text, fontWeight: "800", fontSize: 13, lineHeight: 15 }}>{totalProj.toFixed(1)}</Text>
+            <Text style={[s.catLabel, { color: colors.textSub }]}>PROJ</Text>
+          </View>
+          <View style={{ width: 52, alignItems: "center" }}>
+            <Text style={{ color: hasScore ? colors.text : colors.textSub, fontWeight: "800", fontSize: 13, lineHeight: 15 }}>{hasScore ? pts.toFixed(1) : "—"}</Text>
+            <Text style={[s.catLabel, { color: colors.textSub }]}>SCORE</Text>
+          </View>
           {editMode && <View style={{ width: 26, marginLeft: 6 }} />}
         </View>
 
@@ -643,6 +704,38 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
                 <Ionicons name="close" size={22} color={colors.textSub} />
               </TouchableOpacity>
             </View>
+
+            {/* Logo preview + picker */}
+            <Text style={[s.settingsFieldLabel, { color: colors.textSub }]}>Team Logo</Text>
+            <View style={{ alignItems: "center", marginBottom: 14 }}>
+              <TeamAvatar logoId={pendingLogoId} size={68} />
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }}>
+              <View style={{ flexDirection: "row", gap: 10, paddingVertical: 4 }}>
+                {TEAM_LOGOS.map((logo) => (
+                  <TouchableOpacity
+                    key={logo.id}
+                    onPress={() => setPendingLogoId(logo.id)}
+                    activeOpacity={0.75}
+                    style={{ position: "relative" }}
+                  >
+                    <View style={{
+                      borderRadius: 26, borderWidth: 2,
+                      borderColor: pendingLogoId === logo.id ? colors.accent : "transparent",
+                      padding: 2,
+                    }}>
+                      <TeamAvatar logoId={logo.id} size={44} />
+                    </View>
+                    {pendingLogoId === logo.id && (
+                      <View style={{ position: "absolute", bottom: 0, right: 0, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" }}>
+                        <Ionicons name="checkmark" size={10} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
             <Text style={[s.settingsFieldLabel, { color: colors.textSub }]}>Team Name</Text>
             <TextInput
               style={[s.settingsInput, { backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }]}
