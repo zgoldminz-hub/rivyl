@@ -526,17 +526,13 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
         )}
 
         <Text style={[s.sectionTitle, { color: colors.textSub }]}>Starters · {pts.toFixed(1)} pts</Text>
-        <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {starters.map((r, i) => (
-            <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} isLast={i === starters.length - 1} onPress={editMode ? () => handlePress(r) : undefined} />
-          ))}
-        </View>
+        {starters.map((r, i) => (
+          <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} isLast={i === starters.length - 1} onPress={editMode ? () => handlePress(r) : undefined} />
+        ))}
         <Text style={[s.sectionTitle, { color: colors.textSub, marginTop: 20 }]}>Bench</Text>
-        <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {bench.map((r, i) => (
-            <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} isLast={i === bench.length - 1} onPress={editMode ? () => handlePress(r) : undefined} />
-          ))}
-        </View>
+        {bench.map((r, i) => (
+          <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} isLast={i === bench.length - 1} onPress={editMode ? () => handlePress(r) : undefined} />
+        ))}
       </View>
 
       {/* ── Team Settings Modal ── */}
@@ -641,22 +637,14 @@ function MatchupTab({ leagueId }: { leagueId: string }) {
       </LinearGradient>
 
       <Text style={[s.rosterLabel, { color: colors.textSub }]}>{matchup.homeTeam.name}</Text>
-      <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {sortSlots(matchup.homeTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} showStats isLast={i === arr.length - 1} />)}
-      </View>
+      {sortSlots(matchup.homeTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} showStats isLast={i === arr.length - 1} />)}
       <Text style={[s.rosterLabel, { color: colors.textSub, opacity: 0.5, marginTop: 4 }]}>Bench</Text>
-      <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {benchSlots(matchup.homeTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} muted showStats isLast={i === arr.length - 1} />)}
-      </View>
+      {benchSlots(matchup.homeTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} muted showStats isLast={i === arr.length - 1} />)}
       <View style={[s.divider, { backgroundColor: colors.border }]} />
       <Text style={[s.rosterLabel, { color: colors.textSub }]}>{matchup.awayTeam.name}</Text>
-      <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {sortSlots(matchup.awayTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} showStats isLast={i === arr.length - 1} />)}
-      </View>
+      {sortSlots(matchup.awayTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} showStats isLast={i === arr.length - 1} />)}
       <Text style={[s.rosterLabel, { color: colors.textSub, opacity: 0.5, marginTop: 4 }]}>Bench</Text>
-      <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {benchSlots(matchup.awayTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} muted showStats isLast={i === arr.length - 1} />)}
-      </View>
+      {benchSlots(matchup.awayTeam.rosterSlots).map((sl, i, arr) => <PlayerCard key={sl.id} slot={sl} muted showStats isLast={i === arr.length - 1} />)}
     </ScrollView>
   );
 }
@@ -754,30 +742,28 @@ function WaiversTab({ leagueId }: { leagueId: string }) {
             </ScrollView>
           </View>
           <ScrollView contentContainerStyle={s.content}>
-            <View style={[s.rosterSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {players.map((pl, i) => (
-                <View key={pl.player_id} style={[
-                  s.playerRow,
-                  i < players.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-                ]}>
-                  <View style={[s.headshotFallback, { backgroundColor: `${POS_COLORS[pl.position] ?? "#6b7280"}22` }]}>
-                    <Text style={[s.headshotText, { color: POS_COLORS[pl.position] ?? "#6b7280" }]}>{pl.position?.slice(0, 2)}</Text>
-                  </View>
-                  <View style={[s.slotBadge, { backgroundColor: POS_COLORS[pl.position] ?? "#6b7280" }]}>
-                    <Text style={s.slotText}>{pl.position}</Text>
-                  </View>
-                  <View style={s.playerInfo}>
-                    <Text style={[s.playerName, { color: colors.text }]}>{pl.full_name}</Text>
-                    <Text style={[s.playerMeta, { color: colors.textSub }]}>
-                      {pl.team ?? "FA"}{pl.injury_status ? ` · ${pl.injury_status}` : ""}
-                    </Text>
-                  </View>
-                  <TouchableOpacity style={[s.claimBtn, { backgroundColor: colors.accent }]} onPress={() => setClaimTarget(pl)}>
-                    <Text style={s.claimBtnText}>Add</Text>
-                  </TouchableOpacity>
+            {players.map((pl, i) => (
+              <View key={pl.player_id} style={[
+                s.playerRow,
+                i < players.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+              ]}>
+                <View style={[s.headshotFallback, { backgroundColor: `${POS_COLORS[pl.position] ?? "#6b7280"}22` }]}>
+                  <Text style={[s.headshotText, { color: POS_COLORS[pl.position] ?? "#6b7280" }]}>{pl.position?.slice(0, 2)}</Text>
                 </View>
-              ))}
-            </View>
+                <View style={[s.slotBadge, { backgroundColor: POS_COLORS[pl.position] ?? "#6b7280" }]}>
+                  <Text style={s.slotText}>{pl.position}</Text>
+                </View>
+                <View style={s.playerInfo}>
+                  <Text style={[s.playerName, { color: colors.text }]}>{pl.full_name}</Text>
+                  <Text style={[s.playerMeta, { color: colors.textSub }]}>
+                    {pl.team ?? "FA"}{pl.injury_status ? ` · ${pl.injury_status}` : ""}
+                  </Text>
+                </View>
+                <TouchableOpacity style={[s.claimBtn, { backgroundColor: colors.accent }]} onPress={() => setClaimTarget(pl)}>
+                  <Text style={s.claimBtnText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
           </ScrollView>
         </View>
       ) : (
@@ -961,7 +947,7 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast }: {
     <View style={[
       s.playerRow,
       !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-      selected && { backgroundColor: `${colors.accent}10` },
+      selected && { backgroundColor: `${colors.accent}14` },
       muted && s.playerRowMuted,
     ]}>
       {slot.headshotUrl && !imgErr ? (
@@ -1096,7 +1082,7 @@ const s = StyleSheet.create({
   divider: { height: 1, marginVertical: 20 },
 
   rosterSection: { borderWidth: 1, borderRadius: 12, overflow: "hidden", marginBottom: 6 },
-  playerRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11 },
+  playerRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 4 },
   playerRowMuted: { opacity: 0.4 },
   headshot: { width: 38, height: 38, borderRadius: 19 },
   headshotFallback: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
