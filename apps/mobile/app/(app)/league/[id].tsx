@@ -432,6 +432,8 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
   const starters = roster.filter((r) => r.slot !== "BENCH").sort((a, b) => STARTER_ORDER.indexOf(a.slot) - STARTER_ORDER.indexOf(b.slot));
   const bench = roster.filter((r) => r.slot === "BENCH");
   const pts = starters.reduce((n, r) => n + (r.points ?? 0), 0);
+  const totalProj = starters.reduce((n, r) => n + (r.projected ?? MOCK_PROJ[r.position ?? r.slot] ?? 0), 0);
+  const hasScore = starters.some(r => (r.points ?? 0) > 0);
   const MAX_WEEK = 18;
 
   return (
@@ -514,10 +516,10 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             <Text style={[s.swapHint, { color: colors.accent }]}>Tap a player to swap with {swap.name ?? swap.slot}</Text>
           </View>
         )}
-        {/* Set Lineup + Auto Set row */}
+        {/* Set Lineup row + totals aligned to columns */}
         {!isLocked && (
           !editMode ? (
-            <View style={{ flexDirection: "row", marginBottom: 14 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
               <TouchableOpacity
                 style={[s.lineupEditBar, { backgroundColor: "#C81A1A", marginBottom: 0, paddingHorizontal: 20 }]}
                 onPress={() => setEditMode(true)}
@@ -526,9 +528,13 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
                 <Ionicons name="create-outline" size={14} color="#fff" />
                 <Text style={s.lineupEditBarText}>Set Lineup</Text>
               </TouchableOpacity>
+              <View style={{ flex: 1 }} />
+              <Text style={[s.projCell, { color: colors.text, fontWeight: "800", fontSize: 14 }]}>{totalProj.toFixed(1)}</Text>
+              <Text style={[s.scoreCell, { color: hasScore ? colors.text : colors.textSub, fontWeight: "800", fontSize: 14 }]}>{hasScore ? pts.toFixed(1) : "—"}</Text>
+              <View style={{ width: 32 }} />
             </View>
           ) : (
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 6 }}>
               <TouchableOpacity
                 style={[s.lineupEditBar, { backgroundColor: "#22c55e", flex: 1, marginBottom: 0 }]}
                 onPress={saveLineup}
@@ -547,6 +553,14 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
             </View>
           )
         )}
+
+        {/* Column headers */}
+        <View style={s.colHeaderRow}>
+          <View style={{ flex: 1 }} />
+          <Text style={[s.colHeaderText, { color: colors.textSub }]}>PROJ</Text>
+          <Text style={[s.colHeaderText, { color: colors.textSub }]}>SCORE</Text>
+          {editMode && <View style={{ width: 32 }} />}
+        </View>
 
         {editMode && swap && (
           <Text style={[s.swapHint, { color: colors.textSub, marginBottom: 8, textAlign: "center" }]}>
@@ -1018,22 +1032,14 @@ function PlayerCard({ slot, selected, muted, onPress, showStats, isLast, editMod
           <Text style={[s.playerMeta, { color: colors.textSub }]}>{slot.position}{slot.team ? ` · ${slot.team}` : ""}</Text>
         ) : null}
       </View>
-      <View style={s.projScoreCol}>
-        <View style={s.projScoreRow}>
-          <Text style={[s.projLabel, { color: colors.textSub }]}>PROJ</Text>
-          <Text style={[s.projValue, { color: colors.text }]}>
-            {slot.projected != null
-              ? slot.projected.toFixed(1)
-              : (MOCK_PROJ[slot.position ?? slot.slot] ?? 0).toFixed(1)}
-          </Text>
-        </View>
-        <View style={s.projScoreRow}>
-          <Text style={[s.projLabel, { color: colors.textSub }]}>SCORE</Text>
-          <Text style={[s.projValue, { color: (slot.points ?? 0) > 0 ? colors.text : colors.textSub }]}>
-            {slot.points != null && slot.points > 0 ? slot.points.toFixed(1) : "—"}
-          </Text>
-        </View>
-      </View>
+      <Text style={[s.projCell, { color: colors.textSub }]}>
+        {slot.projected != null
+          ? slot.projected.toFixed(1)
+          : (MOCK_PROJ[slot.position ?? slot.slot] ?? 0).toFixed(1)}
+      </Text>
+      <Text style={[s.scoreCell, { color: (slot.points ?? 0) > 0 ? colors.text : colors.textSub }]}>
+        {slot.points != null && slot.points > 0 ? slot.points.toFixed(1) : "—"}
+      </Text>
       {editMode && !slot.gameStarted && (
         <View style={[
           s.moveHandle,
@@ -1179,10 +1185,10 @@ const s = StyleSheet.create({
   lineupEditBarText: { fontSize: 13, fontWeight: "700", color: "#fff" },
   lockBadge: { position: "absolute", bottom: 0, right: 0, width: 15, height: 15, borderRadius: 8, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center" },
   moveHandle: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", marginLeft: 6 },
-  projScoreCol: { alignItems: "flex-end", gap: 3 },
-  projScoreRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  projLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3, width: 42, textAlign: "right" },
-  projValue: { fontSize: 13, fontWeight: "700", width: 36, textAlign: "right" },
+  colHeaderRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 4, paddingBottom: 4, paddingTop: 2 },
+  colHeaderText: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, width: 48, textAlign: "right" },
+  projCell: { fontSize: 13, fontWeight: "600", width: 48, textAlign: "right" },
+  scoreCell: { fontSize: 13, fontWeight: "600", width: 48, textAlign: "right" },
 
   subTabRow: { flexDirection: "row", borderBottomWidth: 1 },
   subTab: { flex: 1, paddingVertical: 11, alignItems: "center" },
