@@ -10,6 +10,8 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { api } from "../../../src/api/client";
 import { useTheme } from "../../../src/context/theme";
 
+const RV_LOGO = require("../../../assets/RV.png");
+
 interface TeamMember {
   id: string; name: string; username: string; userId: string;
   paid: boolean; isCommissioner: boolean;
@@ -130,8 +132,8 @@ export default function LeagueScreen() {
       end={{ x: 1, y: 0 }}
       style={[s.header, { paddingTop: insets.top + 10 }]}
     >
-      <TouchableOpacity onPress={() => router.back()} style={s.headerBack}>
-        <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.9)" />
+      <TouchableOpacity onPress={() => router.replace("/(app)/dashboard" as any)} style={s.headerLogo} activeOpacity={0.75}>
+        <Image source={RV_LOGO} style={{ width: 72, height: 18 }} resizeMode="contain" />
       </TouchableOpacity>
       <View style={s.headerCenter}>
         <Text style={s.headerLeagueName} numberOfLines={1}>{league?.name ?? "League"}</Text>
@@ -142,11 +144,11 @@ export default function LeagueScreen() {
         )}
       </View>
       {league && (
-        <View style={[s.statusPill, { backgroundColor: `${statusColor}44` }]}>
+        <View style={[s.statusPill, { backgroundColor: `${statusColor}44`, minWidth: 72, alignItems: "flex-end" }]}>
           <Text style={[s.statusText, { color: "#fff" }]}>{league.status}</Text>
         </View>
       )}
-      {!league && <View style={{ width: 60 }} />}
+      {!league && <View style={{ width: 72 }} />}
     </LinearGradient>
   );
 
@@ -310,31 +312,74 @@ function TeamsCard({ league }: { league: LeagueDetail }) {
 
 function MyTeamTab({ leagueId }: { leagueId: string }) {
   const { colors } = useTheme();
-  const [team, setTeam] = useState<{ id: string; name: string } | null>(null);
+  const [team, setTeam] = useState<{ id: string; name: string; abbreviation?: string } | null>(null);
+  const [record, setRecord] = useState<{ wins: number; losses: number } | null>(null);
   const [roster, setRoster] = useState<RosterSlot[]>([]);
-  const [week, setWeek] = useState(1);
+  const [currentWeek, setCurrentWeek] = useState(1);
+  const [selectedWeek, setSelectedWeek] = useState(1);
   const [isLocked, setIsLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [swap, setSwap] = useState<RosterSlot | null>(null);
+  const [matchupPreview, setMatchupPreview] = useState<{ myScore: number; oppScore: number; oppName: string; projected?: number } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [teamName, setTeamName] = useState("");
+  const [teamAbbr, setTeamAbbr] = useState("");
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
-    api.get<{ team: any; roster: RosterSlot[]; currentWeek: number; isLocked: boolean }>(
-      `/season/${leagueId}/my-team`
-    ).then((res) => {
-      if (res.ok) {
-        setTeam(res.data.team);
-        setRoster(res.data.roster);
-        setWeek(res.data.currentWeek);
-        setIsLocked(res.data.isLocked);
+    async function load() {
+      const [teamRes, standingsRes] = await Promise.all([
+        api.get<{ team: any; roster: RosterSlot[]; currentWeek: number; isLocked: boolean }>(`/season/${leagueId}/my-team`),
+        api.get<{ standings: StandingRow[] }>(`/season/${leagueId}/standings`),
+      ]);
+      if (teamRes.ok) {
+        setTeam(teamRes.data.team);
+        setRoster(teamRes.data.roster);
+        setCurrentWeek(teamRes.data.currentWeek);
+        setSelectedWeek(teamRes.data.currentWeek);
+        setIsLocked(teamRes.data.isLocked);
+        setTeamName(teamRes.data.team?.name ?? "");
+        setTeamAbbr(teamRes.data.team?.abbreviation ?? "");
+        if (standingsRes.ok) {
+          const row = standingsRes.data.standings.find((r) => r.teamId === teamRes.data.team?.id);
+          if (row) setRecord({ wins: row.wins, losses: row.losses });
+        }
       }
       setLoading(false);
-    });
+    }
+    load();
   }, [leagueId]);
 
+  useEffect(() => {
+    if (!team) return;
+    api.get<{ matchups: MatchupSummary[] }>(`/season/${leagueId}/matchups/${selectedWeek}`).then((res) => {
+      if (!res.ok) { setMatchupPreview(null); return; }
+      const mine = res.data.matchups.find((m) => m.homeTeam.id === team.id || m.awayTeam.id === team.id);
+      if (!mine) { setMatchupPreview(null); return; }
+      const isHome = mine.homeTeam.id === team.id;
+      setMatchupPreview({
+        myScore: isHome ? mine.homeScore : mine.awayScore,
+        oppScore: isHome ? mine.awayScore : mine.homeScore,
+        oppName: isHome ? mine.awayTeam.name : mine.homeTeam.name,
+      });
+    });
+  }, [leagueId, team, selectedWeek]);
+
+  useEffect(() => {
+    if (!team || selectedWeek === currentWeek) return;
+    api.get<{ roster: RosterSlot[]; isLocked: boolean }>(`/season/${leagueId}/my-team?week=${selectedWeek}`).then((res) => {
+      if (res.ok) {
+        setRoster(res.data.roster);
+        setIsLocked(res.data.isLocked ?? selectedWeek < currentWeek);
+      }
+    });
+  }, [selectedWeek]);
+
   function handlePress(slot: RosterSlot) {
-    if (isLocked) return;
+    if (!editMode || isLocked) return;
     if (!swap) { setSwap(slot); return; }
     if (swap.id === slot.id) { setSwap(null); return; }
     setRoster((prev) => prev.map((r) => {
@@ -351,53 +396,185 @@ function MyTeamTab({ leagueId }: { leagueId: string }) {
       slots: roster.map((r) => ({ playerId: r.playerId, slot: r.slot })),
     });
     setSaving(false);
-    if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 2000); }
+    if (res.ok) { setSaved(true); setEditMode(false); setSwap(null); setTimeout(() => setSaved(false), 2000); }
     else Alert.alert("Error", (res as any).error ?? "Failed to save lineup");
+  }
+
+  async function saveTeamSettings() {
+    setSavingSettings(true);
+    const res = await api.post(`/season/${leagueId}/team/settings`, { name: teamName, abbreviation: teamAbbr });
+    setSavingSettings(false);
+    if (res.ok) {
+      setTeam((prev) => prev ? { ...prev, name: teamName, abbreviation: teamAbbr } : prev);
+      setSettingsOpen(false);
+    } else Alert.alert("Error", (res as any).error ?? "Failed to save settings");
   }
 
   if (loading) return <LoadingView />;
 
-  const starters = roster
-    .filter((r) => r.slot !== "BENCH")
-    .sort((a, b) => STARTER_ORDER.indexOf(a.slot) - STARTER_ORDER.indexOf(b.slot));
+  const starters = roster.filter((r) => r.slot !== "BENCH").sort((a, b) => STARTER_ORDER.indexOf(a.slot) - STARTER_ORDER.indexOf(b.slot));
   const bench = roster.filter((r) => r.slot === "BENCH");
   const pts = starters.reduce((n, r) => n + (r.points ?? 0), 0);
+  const MAX_WEEK = 18;
 
   return (
-    <ScrollView style={s.scroll} contentContainerStyle={s.content}>
-      <View style={s.teamHeaderRow}>
-        <View>
-          <Text style={[s.myTeamName, { color: colors.text }]}>{team?.name}</Text>
-          <Text style={[s.weekLabel, { color: colors.textSub }]}>Week {week}</Text>
-        </View>
-        {isLocked ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Ionicons name="lock-closed" size={12} color={colors.textSub} />
-            <Text style={[s.lockedLabel, { color: colors.textSub }]}>Locked</Text>
+    <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: 48 }}>
+      {/* ── Team Hero ── */}
+      <LinearGradient
+        colors={["#C81A1A18", "#7520CC18", "#1834D418"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={[s.teamHero, { borderBottomColor: colors.border }]}
+      >
+        {/* Row 1: name + record + settings */}
+        <View style={s.heroTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.myTeamName, { color: colors.text }]} numberOfLines={1}>{team?.name}</Text>
+            {record && (
+              <Text style={[s.recordText, { color: colors.textSub }]}>{record.wins}–{record.losses} · Season</Text>
+            )}
           </View>
-        ) : (
-          <TouchableOpacity
-            style={[s.saveBtn, { backgroundColor: saved ? "#22c55e" : colors.accent }]}
-            onPress={saveLineup}
-            disabled={saving}
-          >
-            <Text style={s.saveBtnText}>{saving ? "Saving…" : saved ? "Saved ✓" : "Save Lineup"}</Text>
+          <TouchableOpacity style={[s.settingsBtn, { borderColor: colors.border }]} onPress={() => setSettingsOpen(true)}>
+            <Ionicons name="settings-outline" size={16} color={colors.textSub} />
+            <Text style={[s.settingsBtnText, { color: colors.textSub }]}>Team</Text>
           </TouchableOpacity>
-        )}
-      </View>
-      {!isLocked && swap && (
-        <View style={[s.swapBanner, { backgroundColor: `${colors.accent}18`, borderColor: colors.accent }]}>
-          <Text style={[s.swapHint, { color: colors.accent }]}>Tap another player to swap with {swap.name ?? swap.slot}</Text>
         </View>
-      )}
-      <Text style={[s.sectionTitle, { color: colors.textSub }]}>Starters · {pts.toFixed(1)} pts</Text>
-      {starters.map((r) => (
-        <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} onPress={() => handlePress(r)} />
-      ))}
-      <Text style={[s.sectionTitle, { color: colors.textSub, marginTop: 20 }]}>Bench</Text>
-      {bench.map((r) => (
-        <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} onPress={() => handlePress(r)} />
-      ))}
+
+        {/* Row 2: week selector */}
+        <View style={s.weekRow}>
+          <TouchableOpacity
+            onPress={() => setSelectedWeek((w) => Math.max(1, w - 1))}
+            disabled={selectedWeek <= 1}
+            style={[s.weekArrow, selectedWeek <= 1 && { opacity: 0.3 }]}
+          >
+            <Ionicons name="chevron-back" size={18} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[s.weekLabel, { color: colors.text }]}>
+            Week {selectedWeek}{selectedWeek === currentWeek ? " · Current" : selectedWeek < currentWeek ? " · Past" : " · Upcoming"}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setSelectedWeek((w) => Math.min(MAX_WEEK, w + 1))}
+            disabled={selectedWeek >= MAX_WEEK}
+            style={[s.weekArrow, selectedWeek >= MAX_WEEK && { opacity: 0.3 }]}
+          >
+            <Ionicons name="chevron-forward" size={18} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Row 3: matchup mini-card */}
+        {matchupPreview && (
+          <View style={[s.matchupMini, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={s.matchupMiniHalf}>
+              <Text style={[s.matchupMiniTeam, { color: colors.text }]} numberOfLines={1}>{team?.name}</Text>
+              <Text style={[s.matchupMiniScore, { color: pts > matchupPreview.oppScore ? "#22c55e" : colors.text }]}>
+                {pts.toFixed(1)}
+              </Text>
+            </View>
+            <View style={s.matchupMiniDivider}>
+              <Text style={[s.matchupMiniVs, { color: colors.textSub }]}>VS</Text>
+            </View>
+            <View style={[s.matchupMiniHalf, { alignItems: "flex-end" }]}>
+              <Text style={[s.matchupMiniTeam, { color: colors.text }]} numberOfLines={1}>{matchupPreview.oppName}</Text>
+              <Text style={[s.matchupMiniScore, { color: matchupPreview.oppScore > pts ? "#22c55e" : colors.text }]}>
+                {matchupPreview.oppScore.toFixed(1)}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Row 4: Edit Lineup button */}
+        {!isLocked && selectedWeek === currentWeek && (
+          <View style={s.editRow}>
+            {!editMode ? (
+              <TouchableOpacity style={[s.editBtn, { backgroundColor: colors.accent }]} onPress={() => setEditMode(true)}>
+                <Ionicons name="create-outline" size={15} color="#fff" />
+                <Text style={s.editBtnText}>Edit Lineup</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ flexDirection: "row", gap: 8, flex: 1 }}>
+                <TouchableOpacity style={[s.editBtn, { backgroundColor: "#22c55e", flex: 1 }]} onPress={saveLineup} disabled={saving}>
+                  <Ionicons name="checkmark" size={15} color="#fff" />
+                  <Text style={s.editBtnText}>{saving ? "Saving…" : saved ? "Saved!" : "Save Lineup"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.editBtn, { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border }]}
+                  onPress={() => { setEditMode(false); setSwap(null); }}
+                >
+                  <Text style={[s.editBtnText, { color: colors.textSub }]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+        {isLocked && (
+          <View style={[s.lockedBanner, { backgroundColor: `${"#f59e0b"}18`, borderColor: "#f59e0b44" }]}>
+            <Ionicons name="lock-closed" size={12} color="#f59e0b" />
+            <Text style={[s.lockedBannerText, { color: "#f59e0b" }]}>Lineup locked for this week</Text>
+          </View>
+        )}
+      </LinearGradient>
+
+      {/* ── Lineup ── */}
+      <View style={{ padding: 16 }}>
+        {editMode && swap && (
+          <View style={[s.swapBanner, { backgroundColor: `${colors.accent}18`, borderColor: colors.accent }]}>
+            <Text style={[s.swapHint, { color: colors.accent }]}>Now tap a player to swap with {swap.name ?? swap.slot}</Text>
+          </View>
+        )}
+        {editMode && !swap && (
+          <Text style={[s.swapHint, { color: colors.textSub, marginBottom: 10, textAlign: "center" }]}>Tap a player to move them</Text>
+        )}
+
+        <Text style={[s.sectionTitle, { color: colors.textSub }]}>Starters · {pts.toFixed(1)} pts</Text>
+        {starters.map((r) => (
+          <PlayerCard key={r.id} slot={r} selected={swap?.id === r.id} onPress={editMode ? () => handlePress(r) : undefined} />
+        ))}
+        <Text style={[s.sectionTitle, { color: colors.textSub, marginTop: 20 }]}>Bench</Text>
+        {bench.map((r) => (
+          <PlayerCard key={r.id} slot={r} muted selected={swap?.id === r.id} onPress={editMode ? () => handlePress(r) : undefined} />
+        ))}
+      </View>
+
+      {/* ── Team Settings Modal ── */}
+      <Modal visible={settingsOpen} transparent animationType="slide">
+        <View style={[s.modalOverlay, { backgroundColor: "rgba(0,0,0,0.75)" }]}>
+          <View style={[s.modalBox, { backgroundColor: colors.surface }]}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <Text style={[s.modalTitle, { color: colors.text }]}>Team Settings</Text>
+              <TouchableOpacity onPress={() => setSettingsOpen(false)}>
+                <Ionicons name="close" size={22} color={colors.textSub} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[s.settingsFieldLabel, { color: colors.textSub }]}>Team Name</Text>
+            <TextInput
+              style={[s.settingsInput, { backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }]}
+              value={teamName}
+              onChangeText={setTeamName}
+              placeholder="My Awesome Team"
+              placeholderTextColor={colors.textSub}
+              maxLength={40}
+            />
+            <Text style={[s.settingsFieldLabel, { color: colors.textSub, marginTop: 14 }]}>Abbreviation</Text>
+            <TextInput
+              style={[s.settingsInput, { backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }]}
+              value={teamAbbr}
+              onChangeText={(t) => setTeamAbbr(t.toUpperCase().slice(0, 4))}
+              placeholder="MYT"
+              placeholderTextColor={colors.textSub}
+              autoCapitalize="characters"
+              maxLength={4}
+            />
+            <Text style={[{ fontSize: 11, color: colors.textSub, marginTop: 6, marginBottom: 20 }]}>Up to 4 characters</Text>
+            <TouchableOpacity
+              style={[s.primaryBtn, { backgroundColor: colors.accent }]}
+              onPress={saveTeamSettings}
+              disabled={savingSettings}
+            >
+              <Text style={s.primaryBtnText}>{savingSettings ? "Saving…" : "Save Changes"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -821,7 +998,7 @@ const s = StyleSheet.create({
   emptyText: { fontSize: 14, textAlign: "center" },
 
   header: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 14 },
-  headerBack: { width: 36, marginRight: 4 },
+  headerLogo: { width: 72, justifyContent: "center" },
   headerCenter: { flex: 1, alignItems: "center", paddingHorizontal: 4 },
   headerLeagueName: { color: "#fff", fontWeight: "800", fontSize: 16, letterSpacing: -0.3 },
   headerMeta: { color: "rgba(255,255,255,0.65)", fontSize: 10, fontWeight: "600", marginTop: 2 },
@@ -860,13 +1037,34 @@ const s = StyleSheet.create({
   commLabel: { fontSize: 11, color: "#f59e0b", backgroundColor: "rgba(245,158,11,0.12)", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
 
   teamHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  myTeamName: { fontSize: 18, fontWeight: "800" },
-  weekLabel: { fontSize: 12, marginTop: 2 },
+  myTeamName: { fontSize: 20, fontWeight: "900", letterSpacing: -0.3 },
+  recordText: { fontSize: 12, marginTop: 2, fontWeight: "600" },
+  weekLabel: { fontSize: 14, fontWeight: "700" },
   lockedLabel: { fontSize: 12 },
   saveBtn: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9 },
   saveBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
   swapBanner: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 12 },
   swapHint: { fontSize: 12, textAlign: "center" },
+
+  teamHero: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1 },
+  heroTopRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 14 },
+  settingsBtn: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 10 },
+  settingsBtnText: { fontSize: 12, fontWeight: "600" },
+  weekRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 14, gap: 12 },
+  weekArrow: { padding: 4 },
+  matchupMini: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12 },
+  matchupMiniHalf: { flex: 1 },
+  matchupMiniTeam: { fontSize: 12, fontWeight: "600", marginBottom: 2 },
+  matchupMiniScore: { fontSize: 26, fontWeight: "900" },
+  matchupMiniDivider: { paddingHorizontal: 10, alignItems: "center" },
+  matchupMiniVs: { fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+  editRow: { flexDirection: "row", gap: 8 },
+  editBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9 },
+  editBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
+  lockedBanner: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  lockedBannerText: { fontSize: 12, fontWeight: "600" },
+  settingsFieldLabel: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
+  settingsInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 4 },
 
   scoreCard: { borderWidth: 1, borderRadius: 14, padding: 20, flexDirection: "row", alignItems: "center", marginBottom: 20 },
   scoreHalf: { flex: 1 },
