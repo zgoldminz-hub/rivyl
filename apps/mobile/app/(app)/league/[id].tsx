@@ -142,6 +142,18 @@ function abbrevName(name?: string | null): string {
 const MOCK_PROJ: Record<string, number> = {
   QB: 22.5, RB: 10.8, WR: 11.4, TE: 8.2, FLEX: 10.8, K: 8.0, DEF: 7.5, BENCH: 6.0,
 };
+const DEF_RANK_2025: Record<string, number> = {
+  SF: 1, DAL: 2, BUF: 3, BAL: 4, PHI: 5, MIA: 6, DEN: 7, PIT: 8,
+  CLE: 9, NYJ: 10, LAR: 11, DET: 12, SEA: 13, JAX: 14, MIN: 15, KC: 16,
+  GB: 17, IND: 18, LV: 19, ATL: 20, TB: 21, CIN: 22, NO: 23, WAS: 24,
+  NE: 25, CAR: 26, ARI: 27, HOU: 28, NYG: 29, TEN: 30, CHI: 31, LAC: 32,
+};
+function sosLabel(rank: number): { label: string; color: string; dot: string } {
+  if (rank <= 8)  return { label: "Tough",     color: "#ef4444", dot: "●●○○" };
+  if (rank <= 16) return { label: "Average",   color: "#f59e0b", dot: "●●○○" };
+  if (rank <= 24) return { label: "Favorable", color: "#22c55e", dot: "●●●○" };
+  return           { label: "Easy",       color: "#22c55e", dot: "●●●●" };
+}
 const STATUS_COLOR: Record<string, string> = {
   SETUP: "#6b7280", DRAFTING: "#f59e0b", ACTIVE: "#22c55e",
   PLAYOFFS: "#a78bfa", COMPLETE: "#374151",
@@ -1158,7 +1170,7 @@ function WaiversTab({ leagueId }: { leagueId: string }) {
 
 function TradesTab({ leagueId }: { leagueId: string }) {
   const { colors } = useTheme();
-  const [subTab, setSubTab] = useState<"incoming" | "outgoing" | "history">("incoming");
+  const [subTab, setSubTab] = useState<"incoming" | "outgoing" | "history" | "players">("incoming");
   const [trades, setTrades] = useState<Trade[]>([]);
   const [myTeam, setMyTeam] = useState<{ id: string; name: string } | null>(null);
   const [myRoster, setMyRoster] = useState<RosterSlot[]>([]);
@@ -1239,9 +1251,10 @@ function TradesTab({ leagueId }: { leagueId: string }) {
             <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Propose</Text>
           </TouchableOpacity>
         </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={{ flexDirection: "row", gap: 6 }}>
-          {(["incoming", "outgoing", "history"] as const).map((key) => {
-            const label = key === "incoming" ? "Incoming" : key === "outgoing" ? "Sent" : "History";
+          {(["incoming", "outgoing", "history", "players"] as const).map((key) => {
+            const label = key === "incoming" ? "Incoming" : key === "outgoing" ? "Sent" : key === "history" ? "History" : "Players";
             const count = key === "incoming" ? incoming.length : key === "outgoing" ? outgoing.length : 0;
             const active = subTab === key;
             return (
@@ -1261,26 +1274,31 @@ function TradesTab({ leagueId }: { leagueId: string }) {
             );
           })}
         </View>
+        </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }}>
-        {current.length === 0 ? (
-          <TradeEmptyState tab={subTab} onPropose={() => setProposeOpen(true)} colors={colors} />
-        ) : current.map((trade) => (
-          <TradeCard
-            key={trade.id}
-            trade={trade}
-            myTeamId={myTeam?.id ?? ""}
-            myRoster={myRoster}
-            isIncoming={subTab === "incoming"}
-            isHistory={subTab === "history"}
-            responding={responding}
-            onAccept={() => respond(trade.id, "accept")}
-            onDecline={() => respond(trade.id, "reject")}
-            onCancel={() => cancelTrade(trade.id)}
-          />
-        ))}
-      </ScrollView>
+      {subTab === "players" ? (
+        <TradePlayerAnalyzer onPropose={() => setProposeOpen(true)} />
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }}>
+          {current.length === 0 ? (
+            <TradeEmptyState tab={subTab} onPropose={() => setProposeOpen(true)} colors={colors} />
+          ) : current.map((trade) => (
+            <TradeCard
+              key={trade.id}
+              trade={trade}
+              myTeamId={myTeam?.id ?? ""}
+              myRoster={myRoster}
+              isIncoming={subTab === "incoming"}
+              isHistory={subTab === "history"}
+              responding={responding}
+              onAccept={() => respond(trade.id, "accept")}
+              onDecline={() => respond(trade.id, "reject")}
+              onCancel={() => cancelTrade(trade.id)}
+            />
+          ))}
+        </ScrollView>
+      )}
 
       {proposeOpen && myTeam && (
         <ProposeTradeModal
@@ -1490,6 +1508,180 @@ function TradeEmptyState({ tab, onPropose, colors }: { tab: string; onPropose: (
   );
 }
 
+function TradeSideRow({ player, selected, onToggle, accentColor, colors }: {
+  player: RosterSlot; selected: boolean; onToggle: () => void; accentColor: string; colors: any;
+}) {
+  const posColor = POS_COLORS[player.position ?? ""] ?? colors.textSub;
+  const sos = DEF_RANK_2025[player.team ?? ""] ?? 16;
+  const { label: sosL, color: sosC } = sosLabel(sos);
+  return (
+    <TouchableOpacity onPress={onToggle} activeOpacity={0.75}
+      style={{ borderRadius: 10, marginBottom: 6, padding: 8, backgroundColor: selected ? `${accentColor}14` : "transparent", borderWidth: 1, borderColor: selected ? accentColor : colors.border }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: selected ? accentColor : colors.border }} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.text, fontWeight: "700", fontSize: 12 }} numberOfLines={1}>{abbrevName(player.name)}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
+            <View style={{ paddingHorizontal: 3, paddingVertical: 1, borderRadius: 4, backgroundColor: `${posColor}28` }}>
+              <Text style={{ color: posColor, fontSize: 9, fontWeight: "800" }}>{player.position}</Text>
+            </View>
+            <Text style={{ color: colors.textSub, fontSize: 9 }}>{player.team ?? "FA"}</Text>
+          </View>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ color: colors.text, fontSize: 12, fontWeight: "700" }}>
+            {(player.projected ?? MOCK_PROJ[player.position ?? ""] ?? 0).toFixed(1)}
+          </Text>
+          <Text style={{ color: sosC, fontSize: 8, fontWeight: "600" }}>{sosL}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const ANALYZER_PLAYERS: (RosterSlot & { rank: number })[] = [
+  { id: "ap1",  playerId: "ap1",  slot: "QB",   name: "Josh Allen",           position: "QB",  team: "BUF", points: null, projected: 28.1, rank: 1 },
+  { id: "ap2",  playerId: "ap2",  slot: "QB",   name: "Lamar Jackson",        position: "QB",  team: "BAL", points: null, projected: 26.8, rank: 2 },
+  { id: "ap3",  playerId: "ap3",  slot: "QB",   name: "Patrick Mahomes",      position: "QB",  team: "KC",  points: null, projected: 26.4, rank: 3 },
+  { id: "ap4",  playerId: "ap4",  slot: "RB",   name: "Christian McCaffrey",  position: "RB",  team: "SF",  points: null, projected: 20.1, rank: 4 },
+  { id: "ap5",  playerId: "ap5",  slot: "RB",   name: "Saquon Barkley",       position: "RB",  team: "PHI", points: null, projected: 18.2, rank: 5 },
+  { id: "ap6",  playerId: "ap6",  slot: "WR",   name: "CeeDee Lamb",          position: "WR",  team: "DAL", points: null, projected: 17.3, rank: 6 },
+  { id: "ap7",  playerId: "ap7",  slot: "WR",   name: "Tyreek Hill",          position: "WR",  team: "MIA", points: null, projected: 16.1, rank: 7 },
+  { id: "ap8",  playerId: "ap8",  slot: "WR",   name: "Ja'Marr Chase",        position: "WR",  team: "CIN", points: null, projected: 15.9, rank: 8 },
+  { id: "ap9",  playerId: "ap9",  slot: "RB",   name: "Derrick Henry",        position: "RB",  team: "BAL", points: null, projected: 13.8, rank: 9 },
+  { id: "ap10", playerId: "ap10", slot: "TE",   name: "Travis Kelce",         position: "TE",  team: "KC",  points: null, projected: 14.2, rank: 10 },
+  { id: "ap11", playerId: "ap11", slot: "WR",   name: "A.J. Brown",           position: "WR",  team: "PHI", points: null, projected: 14.8, rank: 11 },
+  { id: "ap12", playerId: "ap12", slot: "RB",   name: "Jahmyr Gibbs",         position: "RB",  team: "DET", points: null, projected: 14.1, rank: 12 },
+  { id: "ap13", playerId: "ap13", slot: "RB",   name: "Kyren Williams",       position: "RB",  team: "LAR", points: null, projected: 13.2, rank: 13 },
+  { id: "ap14", playerId: "ap14", slot: "WR",   name: "Deebo Samuel",         position: "WR",  team: "SF",  points: null, projected: 12.3, rank: 14 },
+  { id: "ap15", playerId: "ap15", slot: "WR",   name: "Puka Nacua",           position: "WR",  team: "LAR", points: null, projected: 11.8, rank: 15 },
+  { id: "ap16", playerId: "ap16", slot: "WR",   name: "Amon-Ra St. Brown",    position: "WR",  team: "DET", points: null, projected: 13.7, rank: 16 },
+  { id: "ap17", playerId: "ap17", slot: "TE",   name: "Sam LaPorta",          position: "TE",  team: "DET", points: null, projected: 9.4,  rank: 17 },
+  { id: "ap18", playerId: "ap18", slot: "TE",   name: "T.J. Hockenson",       position: "TE",  team: "MIN", points: null, projected: 10.8, rank: 18 },
+  { id: "ap19", playerId: "ap19", slot: "QB",   name: "Dak Prescott",         position: "QB",  team: "DAL", points: null, projected: 22.1, rank: 19 },
+  { id: "ap20", playerId: "ap20", slot: "RB",   name: "Tony Pollard",         position: "RB",  team: "TEN", points: null, projected: 10.1, rank: 20 },
+  { id: "ap21", playerId: "ap21", slot: "WR",   name: "Stefon Diggs",         position: "WR",  team: "NE",  points: null, projected: 11.2, rank: 21 },
+  { id: "ap22", playerId: "ap22", slot: "WR",   name: "Chris Olave",          position: "WR",  team: "NO",  points: null, projected: 10.6, rank: 22 },
+  { id: "ap23", playerId: "ap23", slot: "K",    name: "Justin Tucker",        position: "K",   team: "BAL", points: null, projected: 8.5,  rank: 23 },
+  { id: "ap24", playerId: "ap24", slot: "K",    name: "Harrison Butker",      position: "K",   team: "KC",  points: null, projected: 8.1,  rank: 24 },
+  { id: "ap25", playerId: "ap25", slot: "DEF",  name: "San Francisco",        position: "DEF", team: "SF",  points: null, projected: 9.0,  rank: 25 },
+  { id: "ap26", playerId: "ap26", slot: "DEF",  name: "Dallas",               position: "DEF", team: "DAL", points: null, projected: 8.2,  rank: 26 },
+  { id: "ap27", playerId: "ap27", slot: "DEF",  name: "Buffalo",              position: "DEF", team: "BUF", points: null, projected: 8.8,  rank: 27 },
+];
+
+const SORT_OPTIONS: { key: "rank" | "projected" | "sos"; label: string; icon: any }[] = [
+  { key: "rank",      label: "Rank",      icon: "trophy-outline" },
+  { key: "projected", label: "Projected", icon: "stats-chart-outline" },
+  { key: "sos",       label: "Easy SOS",  icon: "shield-checkmark-outline" },
+];
+
+function TradePlayerAnalyzer({ onPropose }: { onPropose: () => void }) {
+  const { colors } = useTheme();
+  const [search, setSearch] = useState("");
+  const [posFilter, setPosFilter] = useState("ALL");
+  const [sortBy, setSortBy] = useState<"rank" | "projected" | "sos">("rank");
+
+  const filtered = ANALYZER_PLAYERS
+    .filter((p) => {
+      if (posFilter !== "ALL" && p.position !== posFilter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        if (!(p.name ?? "").toLowerCase().includes(q) && !(p.team ?? "").toLowerCase().includes(q)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "rank") return a.rank - b.rank;
+      if (sortBy === "projected") return (b.projected ?? 0) - (a.projected ?? 0);
+      const sosA = DEF_RANK_2025[a.team ?? ""] ?? 16;
+      const sosB = DEF_RANK_2025[b.team ?? ""] ?? 16;
+      return sosB - sosA;
+    });
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, gap: 8, marginBottom: 10 }}>
+          <Ionicons name="search" size={16} color={colors.textSub} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search players or NFL team..."
+            placeholderTextColor={colors.textSub}
+            style={{ flex: 1, color: colors.text, fontSize: 14 }}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch("")}>
+              <Ionicons name="close-circle" size={16} color={colors.textSub} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            {POSITIONS.map((pos) => (
+              <TouchableOpacity key={pos} onPress={() => setPosFilter(pos)} activeOpacity={0.75}
+                style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, backgroundColor: posFilter === pos ? colors.accent : colors.bg, borderWidth: 1, borderColor: posFilter === pos ? colors.accent : colors.border }}>
+                <Text style={{ color: posFilter === pos ? "#fff" : colors.textSub, fontSize: 12, fontWeight: posFilter === pos ? "700" : "400" }}>{pos}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          {SORT_OPTIONS.map(({ key, label, icon }) => (
+            <TouchableOpacity key={key} onPress={() => setSortBy(key)} activeOpacity={0.75}
+              style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: sortBy === key ? `${colors.accent}18` : "transparent", borderWidth: 1, borderColor: sortBy === key ? colors.accent : colors.border }}>
+              <Ionicons name={icon} size={11} color={sortBy === key ? colors.accent : colors.textSub} />
+              <Text style={{ color: sortBy === key ? colors.accent : colors.textSub, fontSize: 11, fontWeight: sortBy === key ? "700" : "400" }}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 48 }}>
+        {filtered.length === 0 ? (
+          <View style={{ alignItems: "center", paddingTop: 32 }}>
+            <Ionicons name="search" size={32} color={colors.border} />
+            <Text style={{ color: colors.textSub, marginTop: 10 }}>No players found</Text>
+          </View>
+        ) : filtered.map((player) => {
+          const posColor = POS_COLORS[player.position ?? ""] ?? colors.textSub;
+          const sos = DEF_RANK_2025[player.team ?? ""] ?? 16;
+          const { label: sosL, color: sosC } = sosLabel(sos);
+          return (
+            <View key={player.id} style={{ backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 9, flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: `${posColor}20`, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ color: posColor, fontSize: 11, fontWeight: "800" }}>#{player.rank}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: "700", fontSize: 14 }} numberOfLines={1}>{player.name}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
+                  <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, backgroundColor: `${posColor}28` }}>
+                    <Text style={{ color: posColor, fontSize: 9, fontWeight: "800" }}>{player.position}</Text>
+                  </View>
+                  <Text style={{ color: colors.textSub, fontSize: 11 }}>{player.team ?? "FA"}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sosC }} />
+                    <Text style={{ color: sosC, fontSize: 10, fontWeight: "600" }}>{sosL} SOS</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={{ alignItems: "flex-end", marginRight: 8 }}>
+                <Text style={{ color: colors.text, fontSize: 17, fontWeight: "800" }}>
+                  {(player.projected ?? 0).toFixed(1)}
+                </Text>
+                <Text style={{ color: colors.textSub, fontSize: 9, fontWeight: "500" }}>proj pts</Text>
+              </View>
+              <TouchableOpacity onPress={onPropose} activeOpacity={0.8}
+                style={{ paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: `${colors.accent}18`, borderWidth: 1, borderColor: `${colors.accent}40` }}>
+                <Text style={{ color: colors.accent, fontSize: 11, fontWeight: "700" }}>Trade For</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 function ProposeTradeModal({ leagueId, myTeam, myRoster, allTeams, onClose, onProposed }: {
   leagueId: string; myTeam: { id: string; name: string }; myRoster: RosterSlot[];
   allTeams: { id: string; name: string }[]; onClose: () => void; onProposed: (t: Trade) => void;
@@ -1639,40 +1831,66 @@ function ProposeTradeModal({ leagueId, myTeam, myRoster, allTeams, onClose, onPr
             </ScrollView>
           )}
 
-          {/* ── Step 2: Select players ── */}
+          {/* ── Step 2: Select players side-by-side ── */}
           {step === 2 && (
             <View style={{ flex: 1 }}>
               {loadingRoster ? (
                 <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
               ) : (
-                <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}>
-                  <Text style={{ color: "#ef4444", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, marginBottom: 10 }}>YOUR PLAYERS — TAP TO OFFER</Text>
-                  {sortedMyRoster.map((p) => (
-                    <PlayerRow key={p.id} player={p} selected={mySelected.has(p.playerId)} onToggle={() => toggleMine(p.playerId)} accentColor="#ef4444" />
-                  ))}
-                  <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 14 }} />
-                  <Text style={{ color: "#22c55e", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, marginBottom: 10 }}>
-                    {targetTeam?.name.toUpperCase()} — TAP TO REQUEST
-                  </Text>
-                  {sortedTheirRoster.length === 0 ? (
-                    <Text style={{ color: colors.textSub, fontSize: 13, marginBottom: 12 }}>
-                      Opponent roster couldn't be loaded — backend endpoint needed.
-                    </Text>
-                  ) : sortedTheirRoster.map((p) => (
-                    <PlayerRow key={p.id} player={p} selected={theirSelected.has(p.playerId)} onToggle={() => toggleTheirs(p.playerId)} accentColor="#22c55e" />
-                  ))}
-                </ScrollView>
-              )}
-              {!loadingRoster && (mySelected.size > 0 || theirSelected.size > 0) && (
-                <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }}>
-                  <TouchableOpacity onPress={() => setStep(3)} activeOpacity={0.85} style={{ borderRadius: 14, overflow: "hidden" }}>
-                    <LinearGradient colors={["#C81A1A", "#7520CC", "#1834D4"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 14, alignItems: "center" }}>
-                      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
-                        Review Trade ({mySelected.size + theirSelected.size} player{mySelected.size + theirSelected.size > 1 ? "s" : ""})
-                      </Text>
+                <>
+                  {/* Selection summary bar */}
+                  <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.bg, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                    <View style={{ flex: 1, alignItems: "center" }}>
+                      <Text style={{ color: "#ef4444", fontSize: 9, fontWeight: "800", letterSpacing: 0.6 }}>YOU GIVE</Text>
+                      <Text style={{ color: mySelected.size > 0 ? "#ef4444" : colors.textSub, fontSize: 20, fontWeight: "800" }}>{mySelected.size}</Text>
+                    </View>
+                    <LinearGradient colors={["#C81A1A", "#7520CC"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={{ width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" }}>
+                      <Ionicons name="swap-horizontal" size={15} color="#fff" />
                     </LinearGradient>
-                  </TouchableOpacity>
-                </View>
+                    <View style={{ flex: 1, alignItems: "center" }}>
+                      <Text style={{ color: "#22c55e", fontSize: 9, fontWeight: "800", letterSpacing: 0.6 }}>YOU GET</Text>
+                      <Text style={{ color: theirSelected.size > 0 ? "#22c55e" : colors.textSub, fontSize: 20, fontWeight: "800" }}>{theirSelected.size}</Text>
+                    </View>
+                  </View>
+                  {/* Side-by-side columns */}
+                  <View style={{ flex: 1, flexDirection: "row" }}>
+                    <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: colors.border }}>
+                      <View style={{ paddingHorizontal: 10, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: "#ef444408" }}>
+                        <Text style={{ color: "#ef4444", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 }}>YOUR TEAM</Text>
+                        <Text style={{ color: colors.textSub, fontSize: 9, marginTop: 1 }}>Tap to offer</Text>
+                      </View>
+                      <ScrollView contentContainerStyle={{ padding: 8, paddingBottom: 100 }}>
+                        {sortedMyRoster.map((p) => (
+                          <TradeSideRow key={p.id} player={p} selected={mySelected.has(p.playerId)} onToggle={() => toggleMine(p.playerId)} accentColor="#ef4444" colors={colors} />
+                        ))}
+                      </ScrollView>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ paddingHorizontal: 10, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: "#22c55e08" }}>
+                        <Text style={{ color: "#22c55e", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 }} numberOfLines={1}>{(targetTeam?.name ?? "THEM").toUpperCase()}</Text>
+                        <Text style={{ color: colors.textSub, fontSize: 9, marginTop: 1 }}>Tap to request</Text>
+                      </View>
+                      <ScrollView contentContainerStyle={{ padding: 8, paddingBottom: 100 }}>
+                        {sortedTheirRoster.map((p) => (
+                          <TradeSideRow key={p.id} player={p} selected={theirSelected.has(p.playerId)} onToggle={() => toggleTheirs(p.playerId)} accentColor="#22c55e" colors={colors} />
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                  {/* CTA bar */}
+                  {(mySelected.size > 0 || theirSelected.size > 0) && (
+                    <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <TouchableOpacity onPress={() => setStep(3)} activeOpacity={0.85} style={{ borderRadius: 14, overflow: "hidden" }}>
+                        <LinearGradient colors={["#C81A1A", "#7520CC", "#1834D4"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 14, alignItems: "center" }}>
+                          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
+                            Review Trade ({mySelected.size + theirSelected.size} player{mySelected.size + theirSelected.size > 1 ? "s" : ""})
+                          </Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           )}
