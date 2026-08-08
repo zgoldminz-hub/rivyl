@@ -1511,14 +1511,22 @@ function TradeEmptyState({ tab, onPropose, colors }: { tab: string; onPropose: (
 function TradeSideRow({ player, selected, onToggle, accentColor, colors }: {
   player: RosterSlot; selected: boolean; onToggle: () => void; accentColor: string; colors: any;
 }) {
+  const [imgErr, setImgErr] = useState(false);
   const posColor = POS_COLORS[player.position ?? ""] ?? colors.textSub;
   const sos = DEF_RANK_2025[player.team ?? ""] ?? 16;
   const { label: sosL, color: sosC } = sosLabel(sos);
   return (
     <TouchableOpacity onPress={onToggle} activeOpacity={0.75}
-      style={{ borderRadius: 10, marginBottom: 6, padding: 8, backgroundColor: selected ? `${accentColor}14` : "transparent", borderWidth: 1, borderColor: selected ? accentColor : colors.border }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: selected ? accentColor : colors.border }} />
+      style={{ borderRadius: 10, marginBottom: 6, padding: 7, backgroundColor: selected ? `${accentColor}14` : "transparent", borderWidth: 1, borderColor: selected ? accentColor : colors.border }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: selected ? accentColor : colors.border, flexShrink: 0 }} />
+        {player.headshotUrl && !imgErr ? (
+          <Image source={{ uri: player.headshotUrl }} style={{ width: 34, height: 34, borderRadius: 17, flexShrink: 0 }} onError={() => setImgErr(true)} />
+        ) : (
+          <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: `${posColor}28`, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Text style={{ color: posColor, fontSize: 9, fontWeight: "800" }}>{(player.position ?? "?").slice(0, 2)}</Text>
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <Text style={{ color: colors.text, fontWeight: "700", fontSize: 12 }} numberOfLines={1}>{abbrevName(player.name)}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
@@ -1527,43 +1535,42 @@ function TradeSideRow({ player, selected, onToggle, accentColor, colors }: {
             </View>
             <Text style={{ color: colors.textSub, fontSize: 9 }}>{player.team ?? "FA"}</Text>
           </View>
+          <Text style={{ color: sosC, fontSize: 8, fontWeight: "600", marginTop: 1 }}>{sosL} SOS</Text>
         </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={{ color: colors.text, fontSize: 12, fontWeight: "700" }}>
-            {(player.projected ?? MOCK_PROJ[player.position ?? ""] ?? 0).toFixed(1)}
-          </Text>
-          <Text style={{ color: sosC, fontSize: 8, fontWeight: "600" }}>{sosL}</Text>
-        </View>
+        <Text style={{ color: colors.text, fontSize: 12, fontWeight: "700", flexShrink: 0 }}>
+          {(player.projected ?? MOCK_PROJ[player.position ?? ""] ?? 0).toFixed(1)}
+        </Text>
       </View>
     </TouchableOpacity>
   );
 }
 
+const ESPN = (id: string) => `https://a.espncdn.com/i/headshots/nfl/players/full/${id}.png`;
 const ANALYZER_PLAYERS: (RosterSlot & { rank: number })[] = [
-  { id: "ap1",  playerId: "ap1",  slot: "QB",   name: "Josh Allen",           position: "QB",  team: "BUF", points: null, projected: 28.1, rank: 1 },
-  { id: "ap2",  playerId: "ap2",  slot: "QB",   name: "Lamar Jackson",        position: "QB",  team: "BAL", points: null, projected: 26.8, rank: 2 },
-  { id: "ap3",  playerId: "ap3",  slot: "QB",   name: "Patrick Mahomes",      position: "QB",  team: "KC",  points: null, projected: 26.4, rank: 3 },
-  { id: "ap4",  playerId: "ap4",  slot: "RB",   name: "Christian McCaffrey",  position: "RB",  team: "SF",  points: null, projected: 20.1, rank: 4 },
-  { id: "ap5",  playerId: "ap5",  slot: "RB",   name: "Saquon Barkley",       position: "RB",  team: "PHI", points: null, projected: 18.2, rank: 5 },
-  { id: "ap6",  playerId: "ap6",  slot: "WR",   name: "CeeDee Lamb",          position: "WR",  team: "DAL", points: null, projected: 17.3, rank: 6 },
-  { id: "ap7",  playerId: "ap7",  slot: "WR",   name: "Tyreek Hill",          position: "WR",  team: "MIA", points: null, projected: 16.1, rank: 7 },
-  { id: "ap8",  playerId: "ap8",  slot: "WR",   name: "Ja'Marr Chase",        position: "WR",  team: "CIN", points: null, projected: 15.9, rank: 8 },
-  { id: "ap9",  playerId: "ap9",  slot: "RB",   name: "Derrick Henry",        position: "RB",  team: "BAL", points: null, projected: 13.8, rank: 9 },
-  { id: "ap10", playerId: "ap10", slot: "TE",   name: "Travis Kelce",         position: "TE",  team: "KC",  points: null, projected: 14.2, rank: 10 },
-  { id: "ap11", playerId: "ap11", slot: "WR",   name: "A.J. Brown",           position: "WR",  team: "PHI", points: null, projected: 14.8, rank: 11 },
-  { id: "ap12", playerId: "ap12", slot: "RB",   name: "Jahmyr Gibbs",         position: "RB",  team: "DET", points: null, projected: 14.1, rank: 12 },
-  { id: "ap13", playerId: "ap13", slot: "RB",   name: "Kyren Williams",       position: "RB",  team: "LAR", points: null, projected: 13.2, rank: 13 },
-  { id: "ap14", playerId: "ap14", slot: "WR",   name: "Deebo Samuel",         position: "WR",  team: "SF",  points: null, projected: 12.3, rank: 14 },
-  { id: "ap15", playerId: "ap15", slot: "WR",   name: "Puka Nacua",           position: "WR",  team: "LAR", points: null, projected: 11.8, rank: 15 },
-  { id: "ap16", playerId: "ap16", slot: "WR",   name: "Amon-Ra St. Brown",    position: "WR",  team: "DET", points: null, projected: 13.7, rank: 16 },
-  { id: "ap17", playerId: "ap17", slot: "TE",   name: "Sam LaPorta",          position: "TE",  team: "DET", points: null, projected: 9.4,  rank: 17 },
-  { id: "ap18", playerId: "ap18", slot: "TE",   name: "T.J. Hockenson",       position: "TE",  team: "MIN", points: null, projected: 10.8, rank: 18 },
-  { id: "ap19", playerId: "ap19", slot: "QB",   name: "Dak Prescott",         position: "QB",  team: "DAL", points: null, projected: 22.1, rank: 19 },
-  { id: "ap20", playerId: "ap20", slot: "RB",   name: "Tony Pollard",         position: "RB",  team: "TEN", points: null, projected: 10.1, rank: 20 },
-  { id: "ap21", playerId: "ap21", slot: "WR",   name: "Stefon Diggs",         position: "WR",  team: "NE",  points: null, projected: 11.2, rank: 21 },
-  { id: "ap22", playerId: "ap22", slot: "WR",   name: "Chris Olave",          position: "WR",  team: "NO",  points: null, projected: 10.6, rank: 22 },
-  { id: "ap23", playerId: "ap23", slot: "K",    name: "Justin Tucker",        position: "K",   team: "BAL", points: null, projected: 8.5,  rank: 23 },
-  { id: "ap24", playerId: "ap24", slot: "K",    name: "Harrison Butker",      position: "K",   team: "KC",  points: null, projected: 8.1,  rank: 24 },
+  { id: "ap1",  playerId: "ap1",  slot: "QB",   name: "Josh Allen",           position: "QB",  team: "BUF", points: null, projected: 28.1, rank: 1,  headshotUrl: ESPN("3918298") },
+  { id: "ap2",  playerId: "ap2",  slot: "QB",   name: "Lamar Jackson",        position: "QB",  team: "BAL", points: null, projected: 26.8, rank: 2,  headshotUrl: ESPN("3916387") },
+  { id: "ap3",  playerId: "ap3",  slot: "QB",   name: "Patrick Mahomes",      position: "QB",  team: "KC",  points: null, projected: 26.4, rank: 3,  headshotUrl: ESPN("3139477") },
+  { id: "ap4",  playerId: "ap4",  slot: "RB",   name: "Christian McCaffrey",  position: "RB",  team: "SF",  points: null, projected: 20.1, rank: 4,  headshotUrl: ESPN("3054211") },
+  { id: "ap5",  playerId: "ap5",  slot: "RB",   name: "Saquon Barkley",       position: "RB",  team: "PHI", points: null, projected: 18.2, rank: 5,  headshotUrl: ESPN("3929630") },
+  { id: "ap6",  playerId: "ap6",  slot: "WR",   name: "CeeDee Lamb",          position: "WR",  team: "DAL", points: null, projected: 17.3, rank: 6,  headshotUrl: ESPN("4241479") },
+  { id: "ap7",  playerId: "ap7",  slot: "WR",   name: "Tyreek Hill",          position: "WR",  team: "MIA", points: null, projected: 16.1, rank: 7,  headshotUrl: ESPN("3054245") },
+  { id: "ap8",  playerId: "ap8",  slot: "WR",   name: "Ja'Marr Chase",        position: "WR",  team: "CIN", points: null, projected: 15.9, rank: 8,  headshotUrl: ESPN("4362628") },
+  { id: "ap9",  playerId: "ap9",  slot: "RB",   name: "Derrick Henry",        position: "RB",  team: "BAL", points: null, projected: 13.8, rank: 9,  headshotUrl: ESPN("3054011") },
+  { id: "ap10", playerId: "ap10", slot: "TE",   name: "Travis Kelce",         position: "TE",  team: "KC",  points: null, projected: 14.2, rank: 10, headshotUrl: ESPN("15847") },
+  { id: "ap11", playerId: "ap11", slot: "WR",   name: "A.J. Brown",           position: "WR",  team: "PHI", points: null, projected: 14.8, rank: 11, headshotUrl: ESPN("4040715") },
+  { id: "ap12", playerId: "ap12", slot: "RB",   name: "Jahmyr Gibbs",         position: "RB",  team: "DET", points: null, projected: 14.1, rank: 12, headshotUrl: ESPN("4427366") },
+  { id: "ap13", playerId: "ap13", slot: "RB",   name: "Kyren Williams",       position: "RB",  team: "LAR", points: null, projected: 13.2, rank: 13, headshotUrl: ESPN("4426418") },
+  { id: "ap14", playerId: "ap14", slot: "WR",   name: "Deebo Samuel",         position: "WR",  team: "SF",  points: null, projected: 12.3, rank: 14, headshotUrl: ESPN("4047650") },
+  { id: "ap15", playerId: "ap15", slot: "WR",   name: "Puka Nacua",           position: "WR",  team: "LAR", points: null, projected: 11.8, rank: 15, headshotUrl: ESPN("4427396") },
+  { id: "ap16", playerId: "ap16", slot: "WR",   name: "Amon-Ra St. Brown",    position: "WR",  team: "DET", points: null, projected: 13.7, rank: 16, headshotUrl: ESPN("4241393") },
+  { id: "ap17", playerId: "ap17", slot: "TE",   name: "Sam LaPorta",          position: "TE",  team: "DET", points: null, projected: 9.4,  rank: 17, headshotUrl: ESPN("4426580") },
+  { id: "ap18", playerId: "ap18", slot: "TE",   name: "T.J. Hockenson",       position: "TE",  team: "MIN", points: null, projected: 10.8, rank: 18, headshotUrl: ESPN("4040608") },
+  { id: "ap19", playerId: "ap19", slot: "QB",   name: "Dak Prescott",         position: "QB",  team: "DAL", points: null, projected: 22.1, rank: 19, headshotUrl: ESPN("2577417") },
+  { id: "ap20", playerId: "ap20", slot: "RB",   name: "Tony Pollard",         position: "RB",  team: "TEN", points: null, projected: 10.1, rank: 20, headshotUrl: ESPN("4035640") },
+  { id: "ap21", playerId: "ap21", slot: "WR",   name: "Stefon Diggs",         position: "WR",  team: "NE",  points: null, projected: 11.2, rank: 21, headshotUrl: ESPN("3054295") },
+  { id: "ap22", playerId: "ap22", slot: "WR",   name: "Chris Olave",          position: "WR",  team: "NO",  points: null, projected: 10.6, rank: 22, headshotUrl: ESPN("4362087") },
+  { id: "ap23", playerId: "ap23", slot: "K",    name: "Justin Tucker",        position: "K",   team: "BAL", points: null, projected: 8.5,  rank: 23, headshotUrl: ESPN("15683") },
+  { id: "ap24", playerId: "ap24", slot: "K",    name: "Harrison Butker",      position: "K",   team: "KC",  points: null, projected: 8.1,  rank: 24, headshotUrl: ESPN("3057919") },
   { id: "ap25", playerId: "ap25", slot: "DEF",  name: "San Francisco",        position: "DEF", team: "SF",  points: null, projected: 9.0,  rank: 25 },
   { id: "ap26", playerId: "ap26", slot: "DEF",  name: "Dallas",               position: "DEF", team: "DAL", points: null, projected: 8.2,  rank: 26 },
   { id: "ap27", playerId: "ap27", slot: "DEF",  name: "Buffalo",              position: "DEF", team: "BUF", points: null, projected: 8.8,  rank: 27 },
@@ -1647,37 +1654,57 @@ function TradePlayerAnalyzer({ onPropose }: { onPropose: () => void }) {
           const sos = DEF_RANK_2025[player.team ?? ""] ?? 16;
           const { label: sosL, color: sosC } = sosLabel(sos);
           return (
-            <View key={player.id} style={{ backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 9, flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: `${posColor}20`, alignItems: "center", justifyContent: "center" }}>
-                <Text style={{ color: posColor, fontSize: 11, fontWeight: "800" }}>#{player.rank}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: "700", fontSize: 14 }} numberOfLines={1}>{player.name}</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
-                  <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, backgroundColor: `${posColor}28` }}>
-                    <Text style={{ color: posColor, fontSize: 9, fontWeight: "800" }}>{player.position}</Text>
-                  </View>
-                  <Text style={{ color: colors.textSub, fontSize: 11 }}>{player.team ?? "FA"}</Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sosC }} />
-                    <Text style={{ color: sosC, fontSize: 10, fontWeight: "600" }}>{sosL} SOS</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={{ alignItems: "flex-end", marginRight: 8 }}>
-                <Text style={{ color: colors.text, fontSize: 17, fontWeight: "800" }}>
-                  {(player.projected ?? 0).toFixed(1)}
-                </Text>
-                <Text style={{ color: colors.textSub, fontSize: 9, fontWeight: "500" }}>proj pts</Text>
-              </View>
-              <TouchableOpacity onPress={onPropose} activeOpacity={0.8}
-                style={{ paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: `${colors.accent}18`, borderWidth: 1, borderColor: `${colors.accent}40` }}>
-                <Text style={{ color: colors.accent, fontSize: 11, fontWeight: "700" }}>Trade For</Text>
-              </TouchableOpacity>
-            </View>
+            <AnalyzerPlayerCard key={player.id} player={player} posColor={posColor} sosL={sosL} sosC={sosC} colors={colors} onPropose={onPropose} />
           );
         })}
       </ScrollView>
+    </View>
+  );
+}
+
+function AnalyzerPlayerCard({ player, posColor, sosL, sosC, colors, onPropose }: {
+  player: RosterSlot & { rank: number }; posColor: string; sosL: string; sosC: string; colors: any; onPropose: () => void;
+}) {
+  const [imgErr, setImgErr] = useState(false);
+  return (
+    <View style={{ backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 9, flexDirection: "row", alignItems: "center", gap: 10 }}>
+      {/* Headshot with rank badge */}
+      <View style={{ position: "relative" }}>
+        {player.headshotUrl && !imgErr ? (
+          <Image source={{ uri: player.headshotUrl }} style={{ width: 46, height: 46, borderRadius: 23 }} onError={() => setImgErr(true)} />
+        ) : (
+          <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: `${posColor}20`, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ color: posColor, fontSize: 13, fontWeight: "800" }}>{(player.position ?? "?").slice(0, 2)}</Text>
+          </View>
+        )}
+        <View style={{ position: "absolute", bottom: -2, right: -4, backgroundColor: colors.surface, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 1, borderWidth: 1, borderColor: colors.border }}>
+          <Text style={{ color: posColor, fontSize: 8, fontWeight: "900" }}>#{player.rank}</Text>
+        </View>
+      </View>
+      {/* Info */}
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.text, fontWeight: "700", fontSize: 14 }} numberOfLines={1}>{player.name}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
+          <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, backgroundColor: `${posColor}28` }}>
+            <Text style={{ color: posColor, fontSize: 9, fontWeight: "800" }}>{player.position}</Text>
+          </View>
+          <Text style={{ color: colors.textSub, fontSize: 11 }}>{player.team ?? "FA"}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sosC }} />
+            <Text style={{ color: sosC, fontSize: 10, fontWeight: "600" }}>{sosL} SOS</Text>
+          </View>
+        </View>
+      </View>
+      {/* Projected pts */}
+      <View style={{ alignItems: "flex-end", marginRight: 8 }}>
+        <Text style={{ color: colors.text, fontSize: 17, fontWeight: "800" }}>{(player.projected ?? 0).toFixed(1)}</Text>
+        <Text style={{ color: colors.textSub, fontSize: 9, fontWeight: "500" }}>proj pts</Text>
+      </View>
+      {/* Trade For */}
+      <TouchableOpacity onPress={onPropose} activeOpacity={0.8}
+        style={{ paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: `${colors.accent}18`, borderWidth: 1, borderColor: `${colors.accent}40` }}>
+        <Text style={{ color: colors.accent, fontSize: 11, fontWeight: "700" }}>Trade For</Text>
+      </TouchableOpacity>
     </View>
   );
 }
