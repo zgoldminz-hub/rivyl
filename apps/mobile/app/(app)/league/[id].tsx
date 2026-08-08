@@ -1217,28 +1217,29 @@ function TradesTab({ leagueId }: { leagueId: string }) {
   return (
     <View style={{ flex: 1 }}>
       {/* ── Trade Center header ── */}
-      <LinearGradient
-        colors={["#C81A1A", "#7520CC", "#1834D4"]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <View>
-            <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800", letterSpacing: -0.5 }}>Trade Center</Text>
-            <Text style={{ color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 2 }}>
-              {incoming.length > 0 ? `${incoming.length} incoming offer${incoming.length > 1 ? "s" : ""}` : "Make your move"}
-            </Text>
+      <View style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: `${colors.accent}18`, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="swap-horizontal" size={20} color={colors.accent} />
+            </View>
+            <View>
+              <Text style={{ color: colors.text, fontSize: 19, fontWeight: "800", letterSpacing: -0.3 }}>Trade Center</Text>
+              <Text style={{ color: colors.textSub, fontSize: 11, marginTop: 1 }}>
+                {incoming.length > 0 ? `${incoming.length} incoming offer${incoming.length > 1 ? "s" : ""}` : "Make your move"}
+              </Text>
+            </View>
           </View>
           <TouchableOpacity
             onPress={() => setProposeOpen(true)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.18)", paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" }}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20 }}
             activeOpacity={0.8}
           >
             <Ionicons name="add" size={16} color="#fff" />
             <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Propose</Text>
           </TouchableOpacity>
         </View>
-        <View style={{ flexDirection: "row", gap: 8 }}>
+        <View style={{ flexDirection: "row", gap: 6 }}>
           {(["incoming", "outgoing", "history"] as const).map((key) => {
             const label = key === "incoming" ? "Incoming" : key === "outgoing" ? "Sent" : "History";
             const count = key === "incoming" ? incoming.length : key === "outgoing" ? outgoing.length : 0;
@@ -1247,20 +1248,20 @@ function TradesTab({ leagueId }: { leagueId: string }) {
               <TouchableOpacity
                 key={key}
                 onPress={() => setSubTab(key)}
-                style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 13, paddingVertical: 6, borderRadius: 16, backgroundColor: active ? "rgba(255,255,255,0.22)" : "transparent", borderWidth: 1, borderColor: active ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.12)" }}
+                style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, backgroundColor: active ? `${colors.accent}18` : colors.bg, borderWidth: 1, borderColor: active ? colors.accent : colors.border }}
                 activeOpacity={0.75}
               >
-                <Text style={{ color: "#fff", fontSize: 13, fontWeight: active ? "700" : "400" }}>{label}</Text>
+                <Text style={{ color: active ? colors.accent : colors.textSub, fontSize: 13, fontWeight: active ? "700" : "400" }}>{label}</Text>
                 {count > 0 && (
-                  <View style={{ width: 17, height: 17, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}>
-                    <Text style={{ color: "#C81A1A", fontSize: 9, fontWeight: "800" }}>{count}</Text>
+                  <View style={{ width: 17, height: 17, borderRadius: 9, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>{count}</Text>
                   </View>
                 )}
               </TouchableOpacity>
             );
           })}
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }}>
         {current.length === 0 ? (
@@ -1505,10 +1506,20 @@ function ProposeTradeModal({ leagueId, myTeam, myRoster, allTeams, onClose, onPr
 
   async function selectTeam(team: { id: string; name: string }) {
     setTargetTeam(team);
+    setMySelected(new Set());
+    setTheirSelected(new Set());
     setLoadingRoster(true);
     setStep(2);
-    const res = await api.get<{ roster: RosterSlot[] }>(`/season/${leagueId}/roster/${team.id}`);
-    if (res.ok) setTargetRoster(res.data.roster ?? []);
+    // Try both endpoint patterns the backend might use
+    let roster: RosterSlot[] = [];
+    const r1 = await api.get<{ roster: RosterSlot[] }>(`/season/${leagueId}/roster/${team.id}`);
+    if (r1.ok && r1.data.roster?.length) {
+      roster = r1.data.roster;
+    } else {
+      const r2 = await api.get<{ roster: RosterSlot[] }>(`/season/${leagueId}/team/${team.id}/roster`);
+      if (r2.ok) roster = r2.data.roster ?? [];
+    }
+    setTargetRoster(roster);
     setLoadingRoster(false);
   }
 
@@ -1565,7 +1576,7 @@ function ProposeTradeModal({ leagueId, myTeam, myRoster, allTeams, onClose, onPr
   return (
     <Modal visible animationType="slide" transparent>
       <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" }}>
-        <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "92%" }}>
+        <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: "92%" }}>
           {/* Handle */}
           <View style={{ alignItems: "center", paddingTop: 12, paddingBottom: 6 }}>
             <View style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: colors.border }} />
@@ -1621,7 +1632,11 @@ function ProposeTradeModal({ leagueId, myTeam, myRoster, allTeams, onClose, onPr
                   <Text style={{ color: "#22c55e", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, marginBottom: 10 }}>
                     {targetTeam?.name.toUpperCase()} — TAP TO REQUEST
                   </Text>
-                  {sortedTheirRoster.map((p) => (
+                  {sortedTheirRoster.length === 0 ? (
+                    <Text style={{ color: colors.textSub, fontSize: 13, marginBottom: 12 }}>
+                      Opponent roster couldn't be loaded — backend endpoint needed.
+                    </Text>
+                  ) : sortedTheirRoster.map((p) => (
                     <PlayerRow key={p.id} player={p} selected={theirSelected.has(p.playerId)} onToggle={() => toggleTheirs(p.playerId)} accentColor="#22c55e" />
                   ))}
                 </ScrollView>
