@@ -1158,18 +1158,56 @@ function WaiversTab({ leagueId }: { leagueId: string }) {
 
 function TradesTab({ leagueId }: { leagueId: string }) {
   const { colors } = useTheme();
+  const [subTab, setSubTab] = useState<"incoming" | "outgoing" | "history">("incoming");
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [myTeam, setMyTeam] = useState<{ id: string; name: string } | null>(null);
+  const [myRoster, setMyRoster] = useState<RosterSlot[]>([]);
+  const [allTeams, setAllTeams] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [proposeOpen, setProposeOpen] = useState(false);
+  const [responding, setResponding] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<{ trades: Trade[] }>(`/trades/${leagueId}`).then((res) => {
-      if (res.ok) setTrades(res.data.trades);
+    async function load() {
+      const [tradesRes, teamRes, standingsRes] = await Promise.all([
+        api.get<{ trades: Trade[] }>(`/trades/${leagueId}`),
+        api.get<{ team: any; roster: RosterSlot[] }>(`/season/${leagueId}/my-team`),
+        api.get<{ standings: StandingRow[] }>(`/season/${leagueId}/standings`),
+      ]);
+      if (tradesRes.ok) setTrades(tradesRes.data.trades ?? []);
+      if (teamRes.ok) {
+        const t = teamRes.data.team;
+        setMyTeam({ id: t.id, name: t.name });
+        setMyRoster(teamRes.data.roster ?? []);
+      }
+      if (standingsRes.ok) {
+        setAllTeams(standingsRes.data.standings.map((r) => ({ id: r.teamId, name: r.teamName })));
+      }
       setLoading(false);
-    });
+    }
+    load();
   }, [leagueId]);
 
+  const incoming = trades.filter((t) => t.receivingTeamId === myTeam?.id && t.status === "PENDING");
+  const outgoing = trades.filter((t) => t.proposingTeamId === myTeam?.id && t.status === "PENDING");
+  const history  = trades.filter((t) => t.status !== "PENDING");
+  const current  = subTab === "incoming" ? incoming : subTab === "outgoing" ? outgoing : history;
+
   async function respond(tradeId: string, action: "accept" | "reject") {
+    setResponding(tradeId + action);
     const res = await api.post(`/trades/${tradeId}/${action}`, {});
+    setResponding(null);
+    if (res.ok) {
+      setTrades((prev) =>
+        prev.map((t) => t.id === tradeId ? { ...t, status: action === "accept" ? "ACCEPTED" : "REJECTED" } : t)
+      );
+    } else Alert.alert("Error", (res as any).error ?? "Failed");
+  }
+
+  async function cancelTrade(tradeId: string) {
+    setResponding(tradeId + "cancel");
+    const res = await api.post(`/trades/${tradeId}/cancel`, {});
+    setResponding(null);
     if (res.ok) setTrades((prev) => prev.filter((t) => t.id !== tradeId));
     else Alert.alert("Error", (res as any).error ?? "Failed");
   }
@@ -1177,26 +1215,496 @@ function TradesTab({ leagueId }: { leagueId: string }) {
   if (loading) return <LoadingView />;
 
   return (
-    <ScrollView contentContainerStyle={s.content}>
-      {trades.length === 0 ? (
-        <View style={[s.center, { paddingTop: 40 }]}>
-          <Text style={[s.emptyText, { color: colors.textSub }]}>No pending trades.</Text>
+    <View style={{ flex: 1 }}>
+      {/* ── Trade Center header ── */}
+      <LinearGradient
+        colors={["#C81A1A", "#7520CC", "#1834D4"]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <View>
+            <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800", letterSpacing: -0.5 }}>Trade Center</Text>
+            <Text style={{ color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 2 }}>
+              {incoming.length > 0 ? `${incoming.length} incoming offer${incoming.length > 1 ? "s" : ""}` : "Make your move"}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setProposeOpen(true)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.18)", paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={16} color="#fff" />
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Propose</Text>
+          </TouchableOpacity>
         </View>
-      ) : trades.map((tr) => (
-        <View key={tr.id} style={[s.tradeCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[s.tradeHeader, { color: colors.text }]}>{tr.proposingTeam.name} → {tr.receivingTeam.name}</Text>
-          {tr.note && <Text style={[s.tradeNote, { color: colors.textSub }]}>"{tr.note}"</Text>}
-          <View style={s.tradeActions}>
-            <TouchableOpacity style={s.acceptBtn} onPress={() => respond(tr.id, "accept")}>
-              <Text style={s.acceptBtnText}>Accept</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.rejectBtn, { borderColor: colors.border }]} onPress={() => respond(tr.id, "reject")}>
-              <Text style={[s.rejectBtnText, { color: colors.textSub }]}>Decline</Text>
-            </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {(["incoming", "outgoing", "history"] as const).map((key) => {
+            const label = key === "incoming" ? "Incoming" : key === "outgoing" ? "Sent" : "History";
+            const count = key === "incoming" ? incoming.length : key === "outgoing" ? outgoing.length : 0;
+            const active = subTab === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                onPress={() => setSubTab(key)}
+                style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 13, paddingVertical: 6, borderRadius: 16, backgroundColor: active ? "rgba(255,255,255,0.22)" : "transparent", borderWidth: 1, borderColor: active ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.12)" }}
+                activeOpacity={0.75}
+              >
+                <Text style={{ color: "#fff", fontSize: 13, fontWeight: active ? "700" : "400" }}>{label}</Text>
+                {count > 0 && (
+                  <View style={{ width: 17, height: 17, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ color: "#C81A1A", fontSize: 9, fontWeight: "800" }}>{count}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </LinearGradient>
+
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }}>
+        {current.length === 0 ? (
+          <TradeEmptyState tab={subTab} onPropose={() => setProposeOpen(true)} colors={colors} />
+        ) : current.map((trade) => (
+          <TradeCard
+            key={trade.id}
+            trade={trade}
+            myTeamId={myTeam?.id ?? ""}
+            myRoster={myRoster}
+            isIncoming={subTab === "incoming"}
+            isHistory={subTab === "history"}
+            responding={responding}
+            onAccept={() => respond(trade.id, "accept")}
+            onDecline={() => respond(trade.id, "reject")}
+            onCancel={() => cancelTrade(trade.id)}
+          />
+        ))}
+      </ScrollView>
+
+      {proposeOpen && myTeam && (
+        <ProposeTradeModal
+          leagueId={leagueId}
+          myTeam={myTeam}
+          myRoster={myRoster}
+          allTeams={allTeams.filter((t) => t.id !== myTeam.id)}
+          onClose={() => setProposeOpen(false)}
+          onProposed={(newTrade) => {
+            setTrades((prev) => [newTrade, ...prev]);
+            setProposeOpen(false);
+            setSubTab("outgoing");
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+function TradePill({ player, playerId, side }: { player?: RosterSlot; playerId: string; side: "give" | "get" }) {
+  const { colors } = useTheme();
+  const [imgErr, setImgErr] = useState(false);
+  const posColor = POS_COLORS[player?.position ?? ""] ?? colors.textSub;
+  const isGive = side === "give";
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: isGive ? "#ef444412" : "#22c55e12", borderRadius: 10, padding: 8, borderWidth: 1, borderColor: isGive ? "#ef444432" : "#22c55e32", marginBottom: 6 }}>
+      {player?.headshotUrl && !imgErr ? (
+        <Image source={{ uri: player.headshotUrl }} style={{ width: 30, height: 30, borderRadius: 15 }} onError={() => setImgErr(true)} />
+      ) : (
+        <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: `${posColor}28`, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ color: posColor, fontSize: 9, fontWeight: "800" }}>{(player?.position ?? "?").slice(0, 2)}</Text>
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.text, fontSize: 12, fontWeight: "700" }} numberOfLines={1}>
+          {player ? abbrevName(player.name) : `Player ${playerId.slice(0, 6)}`}
+        </Text>
+        <Text style={{ color: posColor, fontSize: 10, fontWeight: "600" }}>
+          {player?.position ?? "—"}{player?.team ? ` · ${player.team}` : ""}
+        </Text>
+      </View>
+      <Text style={{ color: colors.textSub, fontSize: 11, fontWeight: "600" }}>
+        {(player?.projected ?? MOCK_PROJ[player?.position ?? ""] ?? 0).toFixed(1)}
+      </Text>
+    </View>
+  );
+}
+
+function TradeCard({ trade, myTeamId, myRoster, isIncoming, isHistory, responding, onAccept, onDecline, onCancel }: {
+  trade: Trade; myTeamId: string; myRoster: RosterSlot[];
+  isIncoming: boolean; isHistory: boolean; responding: string | null;
+  onAccept: () => void; onDecline: () => void; onCancel: () => void;
+}) {
+  const { colors } = useTheme();
+  const isMeProposer = trade.proposingTeamId === myTeamId;
+  const offering   = trade.items.filter((i) => i.fromTeamId === trade.proposingTeamId);
+  const requesting = trade.items.filter((i) => i.fromTeamId === trade.receivingTeamId);
+  const iGive = isMeProposer ? offering : requesting;
+  const iGet  = isMeProposer ? requesting : offering;
+  const lookup = Object.fromEntries(myRoster.map((r) => [r.playerId, r]));
+
+  const giveVal = iGive.reduce((s, i) => s + (lookup[i.playerId]?.projected ?? MOCK_PROJ[lookup[i.playerId]?.position ?? ""] ?? 6), 0);
+  const getVal  = iGet.reduce((s, i)  => s + (lookup[i.playerId]?.projected ?? MOCK_PROJ[lookup[i.playerId]?.position ?? ""] ?? 6), 0);
+  const total   = giveVal + getVal;
+  const getPct  = total > 0 ? getVal / total : 0.5;
+  const diff    = getVal - giveVal;
+
+  const STATUS_COLOR: Record<string, string> = { ACCEPTED: "#22c55e", REJECTED: "#ef4444", CANCELLED: "#6b7280" };
+  const STATUS_ICON: Record<string, any>     = { ACCEPTED: "checkmark-circle", REJECTED: "close-circle", CANCELLED: "ban" };
+
+  return (
+    <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: "hidden", marginBottom: 14 }}>
+      {/* Teams row */}
+      <View style={{ flexDirection: "row", alignItems: "center", padding: 14, paddingBottom: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.textSub, fontSize: 9, fontWeight: "700", letterSpacing: 0.8, marginBottom: 2 }}>
+            {isMeProposer ? "YOU OFFER" : "THEY OFFER"}
+          </Text>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: "800" }} numberOfLines={1}>
+            {isMeProposer ? trade.proposingTeam.name : trade.receivingTeam.name}
+          </Text>
+        </View>
+        <LinearGradient colors={["#C81A1A", "#7520CC"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", marginHorizontal: 10 }}>
+          <Ionicons name="swap-horizontal" size={17} color="#fff" />
+        </LinearGradient>
+        <View style={{ flex: 1, alignItems: "flex-end" }}>
+          <Text style={{ color: colors.textSub, fontSize: 9, fontWeight: "700", letterSpacing: 0.8, marginBottom: 2 }}>
+            {isMeProposer ? "YOU WANT" : "THEY WANT"}
+          </Text>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: "800" }} numberOfLines={1}>
+            {isMeProposer ? trade.receivingTeam.name : trade.proposingTeam.name}
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ height: 1, backgroundColor: colors.border }} />
+
+      {/* Player columns */}
+      <View style={{ flexDirection: "row", padding: 12, paddingBottom: 4, gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          {iGive.map((item) => <TradePill key={item.id} player={lookup[item.playerId]} playerId={item.playerId} side="give" />)}
+          {iGive.length === 0 && (
+            <View style={{ height: 46, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", marginBottom: 6 }}>
+              <Text style={{ color: colors.textSub, fontSize: 11 }}>Nothing</Text>
+            </View>
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          {iGet.map((item) => <TradePill key={item.id} player={lookup[item.playerId]} playerId={item.playerId} side="get" />)}
+          {iGet.length === 0 && (
+            <View style={{ height: 46, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", marginBottom: 6 }}>
+              <Text style={{ color: colors.textSub, fontSize: 11 }}>Nothing</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* Trade note */}
+      {!!trade.note && (
+        <View style={{ marginHorizontal: 12, marginBottom: 10, backgroundColor: `${colors.border}55`, borderRadius: 10, padding: 10 }}>
+          <Text style={{ color: colors.textSub, fontSize: 12, fontStyle: "italic" }}>"{trade.note}"</Text>
+        </View>
+      )}
+
+      {/* Value bar */}
+      {total > 0 && (
+        <View style={{ marginHorizontal: 12, marginBottom: 12 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 5 }}>
+            <Text style={{ color: colors.textSub, fontSize: 10, fontWeight: "600" }}>Trade Value</Text>
+            <Text style={{ color: diff > 0 ? "#22c55e" : diff < 0 ? "#ef4444" : colors.textSub, fontSize: 10, fontWeight: "700" }}>
+              {diff > 0 ? `+${diff.toFixed(1)} in your favor` : diff < 0 ? `${diff.toFixed(1)} against you` : "Even trade"}
+            </Text>
+          </View>
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: "hidden" }}>
+            <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.round(getPct * 100)}%`, borderRadius: 3, backgroundColor: diff >= 0 ? "#22c55e" : "#ef4444" }} />
           </View>
         </View>
-      ))}
-    </ScrollView>
+      )}
+
+      {/* History badge */}
+      {isHistory && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginHorizontal: 12, marginBottom: 12, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: `${STATUS_COLOR[trade.status] ?? colors.border}18` }}>
+          <Ionicons name={STATUS_ICON[trade.status] ?? "help-circle"} size={16} color={STATUS_COLOR[trade.status] ?? colors.textSub} />
+          <Text style={{ color: STATUS_COLOR[trade.status] ?? colors.textSub, fontWeight: "700", fontSize: 13 }}>
+            {trade.status.charAt(0) + trade.status.slice(1).toLowerCase()}
+          </Text>
+          <Text style={{ color: colors.textSub, fontSize: 12, marginLeft: "auto" }}>
+            {new Date(trade.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+      )}
+
+      {/* Action buttons */}
+      {!isHistory && (
+        <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 12 }}>
+          {isIncoming ? (
+            <>
+              <TouchableOpacity onPress={onAccept} disabled={!!responding} activeOpacity={0.8}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12, backgroundColor: "#22c55e" }}>
+                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Accept</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onDecline} disabled={!!responding} activeOpacity={0.8}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: "#ef444450", backgroundColor: "#ef444412" }}>
+                <Ionicons name="close" size={16} color="#ef4444" />
+                <Text style={{ color: "#ef4444", fontWeight: "700", fontSize: 14 }}>Decline</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity onPress={onCancel} disabled={!!responding} activeOpacity={0.8}
+              style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+              <Ionicons name="close-circle-outline" size={16} color={colors.textSub} />
+              <Text style={{ color: colors.textSub, fontWeight: "600", fontSize: 14 }}>Withdraw</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function TradeEmptyState({ tab, onPropose, colors }: { tab: string; onPropose: () => void; colors: any }) {
+  const cfg: Record<string, { icon: any; title: string; sub: string }> = {
+    incoming: { icon: "swap-horizontal", title: "No incoming offers", sub: "The wire is quiet. Make the first move." },
+    outgoing: { icon: "paper-plane", title: "No sent offers", sub: "Propose a trade to shake things up." },
+    history:  { icon: "time-outline", title: "No trade history", sub: "Completed trades will show up here." },
+  };
+  const { icon, title, sub } = cfg[tab] ?? cfg.incoming;
+  return (
+    <View style={{ alignItems: "center", paddingTop: 48, paddingBottom: 24 }}>
+      <LinearGradient colors={["#C81A1A55", "#7520CC55", "#1834D455"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={{ width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", marginBottom: 18 }}>
+        <Ionicons name={icon} size={34} color="#fff" />
+      </LinearGradient>
+      <Text style={{ color: colors.text, fontSize: 19, fontWeight: "800", marginBottom: 8 }}>{title}</Text>
+      <Text style={{ color: colors.textSub, fontSize: 14, textAlign: "center", paddingHorizontal: 32, marginBottom: 28, lineHeight: 20 }}>{sub}</Text>
+      {tab !== "history" && (
+        <TouchableOpacity onPress={onPropose} activeOpacity={0.85} style={{ borderRadius: 16, overflow: "hidden" }}>
+          <LinearGradient colors={["#C81A1A", "#7520CC", "#1834D4"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 24, paddingVertical: 13 }}>
+            <Ionicons name="add" size={18} color="#fff" />
+            <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>Propose a Trade</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+function ProposeTradeModal({ leagueId, myTeam, myRoster, allTeams, onClose, onProposed }: {
+  leagueId: string; myTeam: { id: string; name: string }; myRoster: RosterSlot[];
+  allTeams: { id: string; name: string }[]; onClose: () => void; onProposed: (t: Trade) => void;
+}) {
+  const { colors } = useTheme();
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [targetTeam, setTargetTeam] = useState<{ id: string; name: string } | null>(null);
+  const [targetRoster, setTargetRoster] = useState<RosterSlot[]>([]);
+  const [loadingRoster, setLoadingRoster] = useState(false);
+  const [mySelected, setMySelected] = useState<Set<string>>(new Set());
+  const [theirSelected, setTheirSelected] = useState<Set<string>>(new Set());
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function selectTeam(team: { id: string; name: string }) {
+    setTargetTeam(team);
+    setLoadingRoster(true);
+    setStep(2);
+    const res = await api.get<{ roster: RosterSlot[] }>(`/season/${leagueId}/roster/${team.id}`);
+    if (res.ok) setTargetRoster(res.data.roster ?? []);
+    setLoadingRoster(false);
+  }
+
+  function toggleMine(pid: string) {
+    setMySelected((prev) => { const n = new Set(prev); n.has(pid) ? n.delete(pid) : n.add(pid); return n; });
+  }
+  function toggleTheirs(pid: string) {
+    setTheirSelected((prev) => { const n = new Set(prev); n.has(pid) ? n.delete(pid) : n.add(pid); return n; });
+  }
+
+  async function submit() {
+    if (!targetTeam) return;
+    setSubmitting(true);
+    const items = [
+      ...Array.from(mySelected).map((pid) => ({ fromTeamId: myTeam.id, playerId: pid })),
+      ...Array.from(theirSelected).map((pid) => ({ fromTeamId: targetTeam.id, playerId: pid })),
+    ];
+    const res = await api.post(`/trades/${leagueId}/propose`, { receivingTeamId: targetTeam.id, items, note: note || undefined });
+    setSubmitting(false);
+    if (res.ok) onProposed((res as any).data.trade);
+    else Alert.alert("Error", (res as any).error ?? "Failed to send trade offer");
+  }
+
+  const sortedMyRoster = [...myRoster.filter((r) => r.slot !== "BENCH"), ...myRoster.filter((r) => r.slot === "BENCH")];
+  const sortedTheirRoster = [...targetRoster.filter((r) => r.slot !== "BENCH"), ...targetRoster.filter((r) => r.slot === "BENCH")];
+
+  function PlayerRow({ player, selected, onToggle, accentColor }: { player: RosterSlot; selected: boolean; onToggle: () => void; accentColor: string }) {
+    const [imgErr2, setImgErr2] = useState(false);
+    const posColor = POS_COLORS[player.position ?? ""] ?? colors.textSub;
+    return (
+      <TouchableOpacity onPress={onToggle} activeOpacity={0.75}
+        style={{ flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: 12, marginBottom: 7, backgroundColor: selected ? `${accentColor}14` : colors.bg, borderWidth: 1, borderColor: selected ? `${accentColor}55` : colors.border }}>
+        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: selected ? accentColor : colors.border, alignItems: "center", justifyContent: "center" }}>
+          {selected && <Ionicons name="checkmark" size={13} color="#fff" />}
+        </View>
+        {player.headshotUrl && !imgErr2 ? (
+          <Image source={{ uri: player.headshotUrl }} style={{ width: 32, height: 32, borderRadius: 16 }} onError={() => setImgErr2(true)} />
+        ) : (
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: `${posColor}28`, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ color: posColor, fontSize: 9, fontWeight: "800" }}>{(player.position ?? "?").slice(0, 2)}</Text>
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.text, fontWeight: "600", fontSize: 13 }} numberOfLines={1}>{abbrevName(player.name)}</Text>
+          <Text style={{ color: colors.textSub, fontSize: 11 }}>{player.slot} · {player.team ?? "FA"}</Text>
+        </View>
+        <Text style={{ color: colors.textSub, fontSize: 12, fontWeight: "600" }}>
+          {(player.projected ?? MOCK_PROJ[player.position ?? ""] ?? 0).toFixed(1)}
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <Modal visible animationType="slide" transparent>
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" }}>
+        <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "92%" }}>
+          {/* Handle */}
+          <View style={{ alignItems: "center", paddingTop: 12, paddingBottom: 6 }}>
+            <View style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: colors.border }} />
+          </View>
+          {/* Header */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 10 }}>
+            <View>
+              <Text style={{ color: colors.text, fontSize: 19, fontWeight: "800" }}>Propose Trade</Text>
+              <Text style={{ color: colors.textSub, fontSize: 12, marginTop: 2 }}>
+                Step {step} of 3 — {["Pick Team", "Select Players", "Review & Send"][step - 1]}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={colors.textSub} /></TouchableOpacity>
+          </View>
+          {/* Progress bar */}
+          <View style={{ flexDirection: "row", paddingHorizontal: 20, gap: 6, marginBottom: 16 }}>
+            {[1, 2, 3].map((s) => (
+              <View key={s} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: s <= step ? colors.accent : colors.border }} />
+            ))}
+          </View>
+
+          {/* ── Step 1: Pick team ── */}
+          {step === 1 && (
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
+              <Text style={{ color: colors.textSub, fontSize: 11, fontWeight: "700", letterSpacing: 0.8, marginBottom: 12 }}>SELECT OPPONENT</Text>
+              {allTeams.length === 0 && <Text style={{ color: colors.textSub }}>No other teams found.</Text>}
+              {allTeams.map((team) => (
+                <TouchableOpacity key={team.id} onPress={() => selectTeam(team)} activeOpacity={0.75}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, marginBottom: 9 }}>
+                  <LinearGradient colors={["#C81A1A", "#7520CC"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" }}>
+                    <Ionicons name="people" size={18} color="#fff" />
+                  </LinearGradient>
+                  <Text style={{ flex: 1, color: colors.text, fontWeight: "600", fontSize: 15 }}>{team.name}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textSub} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* ── Step 2: Select players ── */}
+          {step === 2 && (
+            <View style={{ flex: 1 }}>
+              {loadingRoster ? (
+                <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
+              ) : (
+                <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}>
+                  <Text style={{ color: "#ef4444", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, marginBottom: 10 }}>YOUR PLAYERS — TAP TO OFFER</Text>
+                  {sortedMyRoster.map((p) => (
+                    <PlayerRow key={p.id} player={p} selected={mySelected.has(p.playerId)} onToggle={() => toggleMine(p.playerId)} accentColor="#ef4444" />
+                  ))}
+                  <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 14 }} />
+                  <Text style={{ color: "#22c55e", fontSize: 11, fontWeight: "700", letterSpacing: 0.8, marginBottom: 10 }}>
+                    {targetTeam?.name.toUpperCase()} — TAP TO REQUEST
+                  </Text>
+                  {sortedTheirRoster.map((p) => (
+                    <PlayerRow key={p.id} player={p} selected={theirSelected.has(p.playerId)} onToggle={() => toggleTheirs(p.playerId)} accentColor="#22c55e" />
+                  ))}
+                </ScrollView>
+              )}
+              {!loadingRoster && (mySelected.size > 0 || theirSelected.size > 0) && (
+                <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }}>
+                  <TouchableOpacity onPress={() => setStep(3)} activeOpacity={0.85} style={{ borderRadius: 14, overflow: "hidden" }}>
+                    <LinearGradient colors={["#C81A1A", "#7520CC", "#1834D4"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 14, alignItems: "center" }}>
+                      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
+                        Review Trade ({mySelected.size + theirSelected.size} player{mySelected.size + theirSelected.size > 1 ? "s" : ""})
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* ── Step 3: Review & send ── */}
+          {step === 3 && (
+            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+              <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <Text style={{ color: colors.text, fontWeight: "800", fontSize: 16 }}>Trade Summary</Text>
+                  <TouchableOpacity onPress={() => setStep(2)}>
+                    <Text style={{ color: colors.accent, fontSize: 13 }}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#ef4444", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 8 }}>YOU GIVE</Text>
+                    {Array.from(mySelected).map((pid) => {
+                      const p = myRoster.find((r) => r.playerId === pid);
+                      return (
+                        <View key={pid} style={{ backgroundColor: "#ef444412", borderRadius: 10, borderWidth: 1, borderColor: "#ef444432", padding: 10, marginBottom: 6 }}>
+                          <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }} numberOfLines={1}>{p ? abbrevName(p.name) : pid}</Text>
+                          <Text style={{ color: colors.textSub, fontSize: 11 }}>{p?.position} · {p?.team ?? "FA"}</Text>
+                        </View>
+                      );
+                    })}
+                    {mySelected.size === 0 && <Text style={{ color: colors.textSub, fontSize: 12 }}>Nothing</Text>}
+                  </View>
+                  <View style={{ alignItems: "center", justifyContent: "center" }}>
+                    <LinearGradient colors={["#C81A1A", "#7520CC"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                      style={{ width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" }}>
+                      <Ionicons name="swap-horizontal" size={15} color="#fff" />
+                    </LinearGradient>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#22c55e", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 8 }}>YOU GET</Text>
+                    {Array.from(theirSelected).map((pid) => {
+                      const p = targetRoster.find((r) => r.playerId === pid);
+                      return (
+                        <View key={pid} style={{ backgroundColor: "#22c55e12", borderRadius: 10, borderWidth: 1, borderColor: "#22c55e32", padding: 10, marginBottom: 6 }}>
+                          <Text style={{ color: colors.text, fontWeight: "700", fontSize: 13 }} numberOfLines={1}>{p ? abbrevName(p.name) : pid}</Text>
+                          <Text style={{ color: colors.textSub, fontSize: 11 }}>{p?.position} · {p?.team ?? "FA"}</Text>
+                        </View>
+                      );
+                    })}
+                    {theirSelected.size === 0 && <Text style={{ color: colors.textSub, fontSize: 12 }}>Nothing</Text>}
+                  </View>
+                </View>
+                <Text style={{ color: colors.textSub, fontSize: 11, fontWeight: "700", letterSpacing: 0.8, marginBottom: 8 }}>ADD A NOTE (OPTIONAL)</Text>
+                <TextInput
+                  value={note} onChangeText={setNote}
+                  placeholder="Trash talk, sweet talk, whatever works…"
+                  placeholderTextColor={colors.textSub}
+                  style={{ backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, color: colors.text, fontSize: 14, minHeight: 80, textAlignVertical: "top", marginBottom: 20 }}
+                  multiline maxLength={200}
+                />
+                <TouchableOpacity onPress={submit} disabled={submitting} activeOpacity={0.85} style={{ borderRadius: 14, overflow: "hidden", opacity: submitting ? 0.7 : 1 }}>
+                  <LinearGradient colors={["#C81A1A", "#7520CC", "#1834D4"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 16, alignItems: "center" }}>
+                    <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
+                      {submitting ? "Sending…" : `Send Offer to ${targetTeam?.name}`}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
